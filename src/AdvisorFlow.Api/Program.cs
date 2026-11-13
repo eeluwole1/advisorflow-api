@@ -1,3 +1,4 @@
+using AdvisorFlow.Api.ApiDocs;
 using AdvisorFlow.Api.ErrorHandling;
 using AdvisorFlow.Application.Households;
 using AdvisorFlow.Infrastructure;
@@ -28,7 +29,12 @@ var app = builder.Build();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
-if (!app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment())
+{
+    // Swagger UI at /swagger, backed by the versioned contract (docs/api/openapi.v1.yaml).
+    app.MapApiDocs();
+}
+else
 {
     app.UseHsts();
     app.UseHttpsRedirection();

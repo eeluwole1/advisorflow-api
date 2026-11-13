@@ -32,7 +32,11 @@ dotnet run --project src/AdvisorFlow.Api --launch-profile http    # http://local
 dotnet test AdvisorFlow.slnx
 ```
 
-Try it: http://localhost:5080/api/households
+Try it:
+
+- **Swagger UI:** http://localhost:5080/swagger (opens automatically with `dotnet run`). It renders the versioned contract and lets you call the live API with *Try it out*. Development only; not served in production.
+- Raw contract: http://localhost:5080/openapi/v1.yaml
+- Plain JSON: http://localhost:5080/api/households
 
 `Cors:AllowedOrigins` in `appsettings.Development.json` allows `http://localhost:4200` (the Angular dev server). `Crm:Provider` chooses `Mock` (default) or `Salesforce`. Salesforce secrets never go in appsettings. Locally they go in `dotnet user-secrets`, and in Azure they go in Key Vault.
 
@@ -44,6 +48,7 @@ Try it: http://localhost:5080/api/households
 | `HouseholdApiTests` | Every endpoint over HTTP; 400/404/502/503; no upstream detail leaks |
 | `ContractTests` | Response JSON fields equal the required fields in `openapi.v1.yaml` |
 | `ArchitectureTests` | Layer rules: Domain ← Application ← Infrastructure ← Api |
+| `ApiDocsTests` | Swagger UI and contract served in Development, 404 in Production |
 
 CI (`.github/workflows/ci.yml`) runs the tests, a vulnerable-package check, an OpenAPI lint and a Salesforce project file check.
 

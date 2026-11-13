@@ -11,6 +11,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The API contract is served at /openapi/v1.yaml for Swagger UI in Development. -->
+    <None Include="..\..\docs\api\openapi.v1.yaml" Link="openapi.v1.yaml" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\AdvisorFlow.Application\AdvisorFlow.Application.csproj" />
     <ProjectReference Include="..\AdvisorFlow.Infrastructure\AdvisorFlow.Infrastructure.csproj" />
   </ItemGroup>
