@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Client_Onboarding_Date__c</fullName>
+    <description>Records the date a client officially completes onboarding with AdvisorFlow CRM.</description>
+    <inlineHelpText>Enter the date the client officially completed onboarding and became an active client.</inlineHelpText>
+    <label>Client Onboarding Date</label>
+    <required>false</required>
+    <trackFeedHistory>false</trackFeedHistory>
+    <type>Date</type>
+</CustomField>

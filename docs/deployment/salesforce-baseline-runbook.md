@@ -16,7 +16,7 @@ sf org display --target-org advisorflow-dev     # note the API version shown
 
 The CLI stores the login in your user profile, outside the repo. Never commit `.sf/` or `.sfdx/` (they are already in `.gitignore`).
 
-If `sf org display` shows a newer API version than `64.0`, update `sourceApiVersion` in `sfdx-project.json` and `<version>` in `manifest/baseline-package.xml` to match.
+If `sf org display` shows a newer API version than the one in `sfdx-project.json` (currently `68.0`, matching the org on 13 Nov 2026), update `sourceApiVersion` in `sfdx-project.json` and `<version>` in `manifest/baseline-package.xml` to match.
 
 ## 3. Retrieve the existing configuration
 
@@ -28,8 +28,8 @@ If `sf org display` shows a newer API version than `64.0`, update `sourceApiVers
 Both run `sf project retrieve start --manifest manifest/baseline-package.xml`. This retrieves:
 
 - the Account, Contact and Opportunity objects, including custom fields such as `Preferred_Contact_Method__c`, Client Status, Client Risk Profile and Customer Priority
-- page layouts
-- profiles and permission sets (the field-level security for those fields)
+- the 12 Account, Contact and Opportunity page layouts
+- 7 profiles (Admin, Standard, Read Only, Marketing, and Custom: Marketing/Sales/Support), which carry the field-level security for those fields
 - the `AccountType` and `OpportunityStage` standard value sets
 
 ## 4. Review before committing

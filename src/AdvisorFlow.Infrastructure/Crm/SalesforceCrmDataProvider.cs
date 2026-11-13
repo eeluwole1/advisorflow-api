@@ -23,7 +23,7 @@ public sealed class SalesforceOptions
     /// <summary>Key Vault certificate name, or a local PEM path for development only.</summary>
     public string? PrivateKeyReference { get; set; }
 
-    public string ApiVersion { get; set; } = "v64.0";
+    public string ApiVersion { get; set; } = "v68.0";
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(LoginUrl) &&

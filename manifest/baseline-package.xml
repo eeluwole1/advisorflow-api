@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  M2 baseline retrieval: the AdvisorFlow configuration that already exists in the
-  Developer Edition org (Account/Contact custom fields, layouts, field-level security).
-  Retrieving the objects together with profiles and permission sets brings back
-  field-level security for those objects' fields.
+  AdvisorFlow baseline: only the metadata this project owns or depends on.
+  Members are listed explicitly (no * wildcards) so a retrieve does not pull every
+  profile, layout and Salesforce-internal permission set in the org.
+  Profiles are retrieved together with the objects so they carry field-level
+  security for Account, Contact and Opportunity fields only.
   Run scripts/retrieve-baseline.sh (or .ps1). See docs/deployment/salesforce-baseline-runbook.md.
 -->
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
@@ -14,21 +15,34 @@
         <name>CustomObject</name>
     </types>
     <types>
-        <members>*</members>
+        <members>Account-Account %28Marketing%29 Layout</members>
+        <members>Account-Account %28Sales%29 Layout</members>
+        <members>Account-Account %28Support%29 Layout</members>
+        <members>Account-Account Layout</members>
+        <members>Contact-Contact %28Marketing%29 Layout</members>
+        <members>Contact-Contact %28Sales%29 Layout</members>
+        <members>Contact-Contact %28Support%29 Layout</members>
+        <members>Contact-Contact Layout</members>
+        <members>Opportunity-Opportunity %28Marketing%29 Layout</members>
+        <members>Opportunity-Opportunity %28Sales%29 Layout</members>
+        <members>Opportunity-Opportunity %28Support%29 Layout</members>
+        <members>Opportunity-Opportunity Layout</members>
         <name>Layout</name>
     </types>
     <types>
-        <members>*</members>
-        <name>PermissionSet</name>
-    </types>
-    <types>
-        <members>*</members>
+        <members>Admin</members>
+        <members>Custom%3A Marketing Profile</members>
+        <members>Custom%3A Sales Profile</members>
+        <members>Custom%3A Support Profile</members>
+        <members>MarketingProfile</members>
+        <members>Read Only</members>
+        <members>Standard</members>
         <name>Profile</name>
     </types>
     <types>
-        <members>OpportunityStage</members>
         <members>AccountType</members>
+        <members>OpportunityStage</members>
         <name>StandardValueSet</name>
     </types>
-    <version>64.0</version>
+    <version>68.0</version>
 </Package>

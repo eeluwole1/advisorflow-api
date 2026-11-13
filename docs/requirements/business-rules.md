@@ -8,7 +8,7 @@ The full rule definitions are in blueprint v1.3 §11.6. This table records where
 | BR-HH-002 | Contact belongs to one household | API + Salesforce | **Read side done (M1):** members are listed per household; unknown household → 404 | `GetMembers_returns_null_for_unknown_household`, `Unknown_household_returns_404` |
 | BR-HH-003 | At most one primary member | API (custom field pending) | **Display done (M1):** primary member listed first; enforcement in M3 | `GetMembers_lists_primary_member_first` |
 | BR-HH-004 | No duplicate members; don't dedupe by name alone | API | Planned (M3) | — |
-| BR-CL-001 | Approved Client Status values only | Salesforce picklist + API | **Done for filters (M1):** unknown status → 400. Values must be verified against the org picklist in M2 | `ValidateQuery_rejects_unapproved_status`, `Invalid_requests_return_400` |
+| BR-CL-001 | Approved Client Status values only | Salesforce picklist + API | **Done for filters (M1):** unknown status → 400. Verified 13 Nov 2026: the org's `Client_Status__c` picklist is Prospect (default), Active, Inactive, matching the API | `ValidateQuery_rejects_unapproved_status`, `Invalid_requests_return_400` |
 | BR-OP-001 | Opportunity needs household, stage, close date | Salesforce + API | Planned (M4) | — |
 | BR-OP-002 | Closed Lost requires a loss reason | Salesforce validation | Planned (M4) | — |
 | BR-OP-003 | Amount = advisory revenue, not AUM | Angular + API | Planned (M4) | — |
