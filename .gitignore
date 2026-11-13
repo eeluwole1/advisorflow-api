@@ -29,3 +29,6 @@ server.key
 .DS_Store
 Thumbs.db
 .idea/
+
+# Files saved by the Claude desktop app
+Claude outputs/
