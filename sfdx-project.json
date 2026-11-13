@@ -5,7 +5,7 @@
       "default": true
     }
   ],
-  "name": "advisorflow-crm",
+  "name": "advisorflow-api",
   "namespace": "",
   "sfdcLoginUrl": "https://login.salesforce.com",
   "sourceApiVersion": "64.0"
