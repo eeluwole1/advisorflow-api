@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dotnet:
+    name: .NET build + xUnit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet restore AdvisorFlow.slnx
+      - run: dotnet build AdvisorFlow.slnx --no-restore --configuration Release
+      - name: Tests (unit, HTTP integration, contract, architecture)
+        run: dotnet test AdvisorFlow.slnx --no-build --configuration Release --logger "trx;LogFileName=api-tests.trx" --results-directory TestResults
+      - name: Vulnerable package check
+        run: dotnet list AdvisorFlow.slnx package --vulnerable --include-transitive 2>&1 | tee vuln.txt; ! grep -qE "(High|Critical)" vuln.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-test-results
+          path: TestResults
+
+  contract:
+    name: OpenAPI contract lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npx --yes @redocly/cli@2 lint docs/api/openapi.v1.yaml
+
+  salesforce:
+    name: Salesforce metadata
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate project files
+        run: |
+          python3 -m json.tool sfdx-project.json > /dev/null
+          python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('manifest/baseline-package.xml')"
+      # Org-connected validation (sf project deploy validate) is added in M2,
+      # once a CI auth secret for the Developer Edition org exists.

@@ -1,0 +1,203 @@
+openapi: 3.1.0
+info:
+  title: AdvisorFlow API
+  version: 1.0.0
+  summary: Household CRM API consumed by advisorflow-web.
+  description: |
+    Versioned contract between advisorflow-api and advisorflow-web (blueprint v1.3 §11.5A).
+
+    Versioning rules:
+    - PATCH (1.0.x): wording, examples, documentation only.
+    - MINOR (1.x.0): backward-compatible additions — new endpoints, new optional fields,
+      new optional query parameters.
+    - MAJOR (2.0.0): anything that can break the frontend — renamed/removed fields,
+      changed types, new required inputs. Served side by side under a new path prefix.
+
+    All records are fictional. `riskProfile` is a CRM classification tag, not an
+    investment suitability assessment.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: http://localhost:5080
+    description: Local development
+tags:
+  - name: Health
+    description: Service liveness.
+  - name: Households
+    description: Households (Salesforce Accounts) and their members (Contacts).
+paths:
+  /health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: Liveness check
+      security: []
+      responses:
+        '200':
+          description: The API is running.
+          content:
+            text/plain:
+              schema:
+                type: string
+                examples: [Healthy]
+  /api/households:
+    get:
+      tags: [Households]
+      operationId: listHouseholds
+      summary: Paginated household summaries
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: search
+          in: query
+          description: Case-insensitive match on household name.
+          schema: { type: string, maxLength: 80 }
+        - name: status
+          in: query
+          description: Approved Client Status values only (BR-CL-001).
+          schema: { $ref: '#/components/schemas/ClientStatus' }
+      responses:
+        '200':
+          description: One page of households, ordered by name.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdSummaryPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/households/{id}:
+    get:
+      tags: [Households]
+      operationId: getHousehold
+      summary: Household detail
+      parameters:
+        - $ref: '#/components/parameters/HouseholdId'
+      responses:
+        '200':
+          description: The household.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdDetail' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/households/{id}/contacts:
+    get:
+      tags: [Households]
+      operationId: listHouseholdMembers
+      summary: Household members, primary member first
+      parameters:
+        - $ref: '#/components/parameters/HouseholdId'
+      responses:
+        '200':
+          description: Members of the household; empty when it has none.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/HouseholdMember' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+components:
+  parameters:
+    HouseholdId:
+      name: id
+      in: path
+      required: true
+      description: 15- or 18-character Salesforce Account id.
+      schema: { type: string, pattern: '^[a-zA-Z0-9]{15}([a-zA-Z0-9]{3})?$' }
+  schemas:
+    ClientStatus:
+      type: string
+      enum: [Prospect, Active, Inactive]
+    HouseholdSummary:
+      type: object
+      required: [id, name, clientStatus, riskProfile, priority, memberCount, primaryContactName]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        clientStatus: { $ref: '#/components/schemas/ClientStatus' }
+        riskProfile: { type: [string, 'null'], description: CRM classification tag only. }
+        priority: { type: [string, 'null'] }
+        memberCount: { type: integer, minimum: 0 }
+        primaryContactName: { type: [string, 'null'] }
+    HouseholdSummaryPage:
+      type: object
+      required: [items, page, pageSize, totalCount, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/HouseholdSummary' }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1 }
+        totalCount: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    HouseholdDetail:
+      type: object
+      required: [id, name, clientStatus, riskProfile, priority, phone, accountNumber, memberCount]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        clientStatus: { $ref: '#/components/schemas/ClientStatus' }
+        riskProfile: { type: [string, 'null'], description: CRM classification tag only. }
+        priority: { type: [string, 'null'] }
+        phone: { type: [string, 'null'] }
+        accountNumber: { type: [string, 'null'] }
+        memberCount: { type: integer, minimum: 0 }
+    HouseholdMember:
+      type: object
+      required: [id, householdId, firstName, lastName, fullName, email, phone, preferredContactMethod, isPrimary]
+      properties:
+        id: { type: string }
+        householdId: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        fullName: { type: string }
+        email: { type: [string, 'null'] }
+        phone: { type: [string, 'null'] }
+        preferredContactMethod:
+          type: [string, 'null']
+          description: Email, Phone or SMS. Not the same as marketing consent (BR-SEC-002).
+        isPrimary: { type: boolean }
+    ProblemDetails:
+      type: object
+      description: RFC 9457 problem details.
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        traceId: { type: string }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+  responses:
+    ValidationError:
+      description: Invalid query parameter or id.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    NotFound:
+      description: The household does not exist.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    UpstreamError:
+      description: The CRM returned an error. No upstream detail is exposed.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    Unavailable:
+      description: The CRM is unreachable or not configured.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }

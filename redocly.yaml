@@ -1,0 +1,10 @@
+extends:
+  - recommended
+
+rules:
+  # Authentication is introduced in M3; until then endpoints are intentionally open locally.
+  security-defined: off
+  # The only server listed today is local development; Azure URLs are added in M7.
+  no-server-example.com: off
+  # /health deliberately has no 4xx responses.
+  operation-4xx-response: off

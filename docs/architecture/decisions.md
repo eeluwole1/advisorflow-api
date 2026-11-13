@@ -1,0 +1,51 @@
+# Architecture Decision Records
+
+## ADR-001: Full-stack application with Salesforce as system of record
+**Status:** Approved, 13 Nov 2026 (blueprint §11.1)
+
+Angular + TypeScript + Tailwind frontend, C# ASP.NET Core Web API backend, Salesforce Developer Edition as the CRM system of record, hosted on Azure. The browser never holds Salesforce credentials. All Salesforce access goes through the API using server-side OAuth. Salesforce Lightning remains the admin and verification interface. Salesforce Flow owns platform-native automation.
+
+## ADR-002: Households are modeled as Accounts (MVP design decision)
+**Status:** Approved for MVP, 13 Nov 2026 (blueprint §8)
+
+- A household is a standard **Account**. Each individual member is a **Contact** with `AccountId` pointing to that household. Opportunities belong to the household Account.
+- Person Accounts are **not** enabled; once enabled, they cannot be turned off.
+- Households are identified by an Account record type or a clearly defined Account classification. Which one to use is confirmed during the M2 baseline review.
+- A Contact has one primary household in the MVP. Multi-household membership is out of scope.
+- **Scope:** this is a design decision for this MVP, not a claim about a universal standard for financial advisory CRMs. Revisit it if the business needs individual-client or business-client models.
+
+## ADR-003: Provider abstraction between the API and the CRM
+**Status:** Approved, 13 Nov 2026
+
+The API depends on `ICrmDataProvider` (in `AdvisorFlow.Application`), never on Salesforce directly.
+
+- `MockCrmDataProvider` (in `AdvisorFlow.Infrastructure`) serves fictional in-memory data for local development and tests.
+- `SalesforceCrmDataProvider` (M2) implements the same interface against the Salesforce REST API.
+- Configuration (`Crm:Provider`) selects the provider. The Angular app binds to the versioned contract (`docs/api/openapi.v1.yaml`), so switching providers needs no frontend change.
+- Providers return `null` for "not found" and throw `CrmUnavailableException` (→ 503) or `CrmUpstreamException` (→ 502) for integration failures. Error responses never include upstream details.
+
+## ADR-004: Local-first development, Azure deployment later
+**Status:** Approved, 13 Nov 2026
+
+Milestones M1–M6 run entirely on the developer's computer: the API on `localhost:5080`, and advisorflow-web on `localhost:4200` with a dev proxy. No Azure resources are provisioned until M7. Before anything is provisioned in M7, an Azure budget and cost alerts are set. This avoids cloud cost while the application is still changing quickly.
+
+## ADR-005: Separate frontend and backend repositories
+**Status:** Approved, 13 Nov 2026. Supersedes the monorepo layout. Blueprint v1.3 §11.5A records this decision as "ADR-002".
+
+- `advisorflow-web` (Angular) and `advisorflow-api` (ASP.NET Core) are separate GitHub repositories. Each has its own versioning, CI, deployment, secrets and release history.
+- Salesforce DX metadata lives in `advisorflow-api` for now, with its own validation step. It moves to a third repository only if release ownership requires it.
+- The two repositories are bound by a versioned OpenAPI contract (`docs/api/openapi.v1.yaml`) with backward-compatible changes inside a major version. `ContractTests` checks the API against it on every build.
+- The frontend never stores Salesforce secrets. The backend mediates Salesforce calls and enforces authorization.
+- Deployment targets: Azure Static Web Apps (web) and Azure App Service (api). Because they are different origins, the API allows the web origin via `Cors:AllowedOrigins`, and the web production build sets an absolute `apiBaseUrl`.
+
+## ADR-006: Layered backend projects
+**Status:** Approved, 13 Nov 2026 (blueprint v1.3 §15)
+
+`AdvisorFlow.Domain` ← `AdvisorFlow.Application` ← `AdvisorFlow.Infrastructure` ← `AdvisorFlow.Api`.
+
+- **Domain:** the household model and business values. No dependencies.
+- **Application:** use cases, validation, DTOs and the `ICrmDataProvider` abstraction. It depends only on Domain and has no ASP.NET Core dependency.
+- **Infrastructure:** CRM providers and their configuration.
+- **Api:** controllers, error mapping and the composition root.
+
+`ArchitectureTests` enforces these rules.

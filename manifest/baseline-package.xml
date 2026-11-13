@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  M2 baseline retrieval: the AdvisorFlow configuration that already exists in the
+  Developer Edition org (Account/Contact custom fields, layouts, field-level security).
+  Retrieving the objects together with profiles and permission sets brings back
+  field-level security for those objects' fields.
+  Run scripts/retrieve-baseline.sh (or .ps1). See docs/deployment/salesforce-baseline-runbook.md.
+-->
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>Account</members>
+        <members>Contact</members>
+        <members>Opportunity</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>Layout</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>PermissionSet</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>Profile</name>
+    </types>
+    <types>
+        <members>OpportunityStage</members>
+        <members>AccountType</members>
+        <name>StandardValueSet</name>
+    </types>
+    <version>64.0</version>
+</Package>

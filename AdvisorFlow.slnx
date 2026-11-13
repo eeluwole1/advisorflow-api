@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AdvisorFlow.Api/AdvisorFlow.Api.csproj" />
+    <Project Path="src/AdvisorFlow.Application/AdvisorFlow.Application.csproj" />
+    <Project Path="src/AdvisorFlow.Domain/AdvisorFlow.Domain.csproj" />
+    <Project Path="src/AdvisorFlow.Infrastructure/AdvisorFlow.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AdvisorFlow.Api.Tests/AdvisorFlow.Api.Tests.csproj" />
+  </Folder>
+</Solution>

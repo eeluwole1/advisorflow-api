@@ -1,0 +1,31 @@
+# .NET
+bin/
+obj/
+*.user
+TestResults/
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+coverage/
+
+# Salesforce DX
+.sf/
+.sfdx/
+.localdevserver/
+**/.vscode/settings.json
+
+# Secrets — never commit credentials, keys or org auth files
+*.pem
+*.key
+*.pfx
+.env
+.env.*
+appsettings.*.local.json
+server.key
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
