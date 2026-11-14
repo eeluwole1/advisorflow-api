@@ -84,10 +84,93 @@ Result (verified 13 Nov 2026):
 
 The primary-member flag (BR-HH-003) has no Salesforce field yet; it is added in M3. Until then the Salesforce provider reports `isPrimary: false`.
 
-## 7. Prepare the OAuth integration (start of the M2 coding work)
+## 7. Set up the OAuth integration (JWT bearer flow)
 
-This is done together in the next session:
+Done on 13 Nov 2026. The API signs in to Salesforce as a dedicated, read-only integration user, using the OAuth 2.0 JWT bearer flow. No password and no browser step are involved: the API signs a JWT with a private key, and Salesforce checks it against the uploaded certificate.
 
-- Create a dedicated integration user with a least-privilege permission set (read Account and Contact).
-- Create an External Client App configured for the OAuth 2.0 JWT bearer flow, with a certificate. The private key stays outside the repo: in `dotnet user-secrets` locally, and in Azure Key Vault later.
-- Confirm Developer Edition API limits and integration-user licensing before relying on them.
+### 7a. Key pair (outside the repo)
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.advisorflow" | Out-Null
+cd "$env:USERPROFILE\.advisorflow"
+Set-Alias openssl "C:\Program Files\Git\usr\bin\openssl.exe"   # OpenSSL that ships with Git for Windows
+openssl genrsa -out server.key 2048
+openssl req -new -x509 -key server.key -out server.crt -days 365 -subj "/CN=AdvisorFlow API"
+```
+
+- `server.key` is the real credential. It never goes into Git, chat or screenshots. In Azure it moves to Key Vault.
+- `server.crt` is public. It is uploaded to Salesforce and expires after 365 days (renew before 13 Nov 2027).
+
+### 7b. Permission set `AdvisorFlow API Read` (`AdvisorFlow_API_Read`)
+
+License: Salesforce API Integration. Read-only, nothing else.
+
+| Object | Object permissions | Field read access |
+|---|---|---|
+| Account | Read, View All Records | Account Number, Phone, Client Status, Client Risk Profile, Customer Priority (Name, Owner, Record Type are automatic) |
+| Contact | Read, View All Records | Account Name (`AccountId`), Email, Phone, Preferred Contact Method (Name is automatic) |
+
+No tab settings, no record type assignments, no edit access.
+
+### 7c. Integration user
+
+| Setting | Value |
+|---|---|
+| Name | AdvisorFlow Integration |
+| Username | `advisorflow.integration@eeluwole.dev` |
+| User license | Salesforce Integration |
+| Profile | Minimum Access - API Only Integrations (no UI login) |
+| Role | None (`View All Records` already covers visibility) |
+| Permission set license | Salesforce API Integration |
+| Permission set | AdvisorFlow API Read |
+
+### 7d. External Client App `AdvisorFlow API` (`AdvisorFlow_API`)
+
+- Distribution state: Local.
+- Callback URL: `http://localhost:1717/OauthRedirect` (required by the form; the JWT flow does not use it).
+- OAuth scopes: `api`, `refresh_token, offline_access`.
+- Flows: JWT bearer flow only, with `server.crt` uploaded.
+- Policies: Permitted users = Admin approved users are pre-authorized; selected permission set = AdvisorFlow API Read.
+- The Consumer Secret is not used by the JWT flow and is not stored anywhere.
+
+### 7e. Verify with the CLI
+
+```powershell
+$clientId = Read-Host "Consumer Key"   # paste; keeps the key out of history and screenshots
+sf org login jwt --client-id $clientId --jwt-key-file "$env:USERPROFILE\.advisorflow\server.key" `
+  --username advisorflow.integration@eeluwole.dev `
+  --instance-url https://orgfarm-c274b45e01-dev-ed.develop.my.salesforce.com --alias advisorflow-integration
+```
+
+| Check | Result |
+|---|---|
+| JWT login | Authorized, org `00Dfj00000oMPSnEAO` |
+| Query households (Account, record type Household) | 2 records with all custom fields |
+| Query contacts of households | 2 records with Email, Phone, Preferred Contact Method, AccountId |
+| Update an Account | Rejected: `entity type cannot be updated: Account` (expected) |
+
+Changes to an External Client App can take a few minutes to apply; if the first login returns `invalid_client_id`, wait and retry.
+
+### 7f. Local configuration (`dotnet user-secrets`)
+
+```powershell
+cd C:\advisorflow-api
+dotnet user-secrets init --project src\AdvisorFlow.Api      # adds <UserSecretsId> to the csproj (safe to commit)
+dotnet user-secrets set "Salesforce:LoginUrl" "https://orgfarm-c274b45e01-dev-ed.develop.my.salesforce.com" --project src\AdvisorFlow.Api
+dotnet user-secrets set "Salesforce:ClientId" $clientId --project src\AdvisorFlow.Api
+dotnet user-secrets set "Salesforce:IntegrationUsername" "advisorflow.integration@eeluwole.dev" --project src\AdvisorFlow.Api
+dotnet user-secrets set "Salesforce:PrivateKeyReference" "C:\Users\user\.advisorflow\server.key" --project src\AdvisorFlow.Api
+```
+
+The values live in `%APPDATA%\Microsoft\UserSecrets\<UserSecretsId>\secrets.json`, outside the repo, and override the empty placeholders in `appsettings.json` in Development. `Crm:Provider` stays `Mock` until the Salesforce provider is implemented.
+
+To check without printing the Consumer Key:
+
+```powershell
+dotnet user-secrets list --project src\AdvisorFlow.Api | ForEach-Object { $_ -replace '^(Salesforce:ClientId = ).+$', '$1<hidden>' }
+```
+
+### Follow-ups
+
+- Daniel Carter shares James Williams's phone number (204-555-0101), left over from the original test contact. Give him his own fictional number with the admin login (`advisorflow-dev`), not the read-only integration user.
+- Developer Edition API limits apply; the API should cache the access token rather than signing in per request.
