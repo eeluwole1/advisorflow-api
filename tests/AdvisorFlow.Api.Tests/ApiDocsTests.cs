@@ -1,11 +1,10 @@
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace AdvisorFlow.Api.Tests;
 
 /// <summary>Swagger UI and the contract file are served in Development only.</summary>
-public class ApiDocsTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+public class ApiDocsTests(MockApiFactory factory) : IClassFixture<MockApiFactory>
 {
     [Fact]
     public async Task Swagger_ui_is_served_in_development()

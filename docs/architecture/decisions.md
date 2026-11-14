@@ -49,3 +49,15 @@ Milestones M1–M6 run entirely on the developer's computer: the API on `localho
 - **Api:** controllers, error mapping and the composition root.
 
 `ArchitectureTests` enforces these rules.
+
+## ADR-007: Server-to-server Salesforce access with the JWT bearer flow
+**Status:** Approved, 13 Nov 2026 (milestone M2)
+
+The API reads Salesforce as one dedicated **integration user**, signing in with the **OAuth 2.0 JWT bearer flow** through an External Client App.
+
+- **Why JWT bearer:** no password and no browser step. The API proves its identity by signing a short-lived JWT with a private key; Salesforce verifies it with the uploaded certificate. Nothing reusable travels with the request, and the Consumer Secret is not used at all.
+- **Least privilege:** the integration user has the Salesforce Integration license, the *Minimum Access - API Only Integrations* profile (no UI login) and one permission set, `AdvisorFlow API Read` (read Account and Contact, selected fields only). It is pre-authorized for the app through that permission set. A test update is rejected by Salesforce.
+- **Secrets:** the private key and connection settings live outside the repository: `dotnet user-secrets` locally, Azure Key Vault when deployed (M7).
+- **Token reuse:** the access token is cached and renewed after 30 minutes or on a 401, to stay within Developer Edition API limits.
+- **Trade-off:** every API caller sees the same data, because Salesforce sees one user. Per-advisor visibility (each advisor sees their own households) would need user-level OAuth or filtering in the API, and is out of scope for the MVP.
+- **Failure mapping:** sign-in or network failures and Salesforce 5xx/429 become `503`; rejected queries or unreadable responses become `502`. Salesforce error details are logged, never returned.

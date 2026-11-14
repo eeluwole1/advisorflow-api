@@ -29,5 +29,5 @@ public sealed class CrmUnavailableException(string message, Exception? inner = n
     : Exception(message, inner);
 
 /// <summary>The CRM answered with an error or unusable data. The API maps this to HTTP 502.</summary>
-public sealed class CrmUpstreamException(string message, Exception? inner = null)
+public class CrmUpstreamException(string message, Exception? inner = null)
     : Exception(message, inner);

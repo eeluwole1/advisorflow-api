@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace AdvisorFlow.Api.Tests;
 
@@ -9,9 +8,10 @@ namespace AdvisorFlow.Api.Tests;
 /// Each response's JSON property names must equal the schema's required list, so a
 /// renamed, removed or undocumented field fails the build before the frontend breaks.
 /// </summary>
-public class ContractTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+public class ContractTests(MockApiFactory factory) : IClassFixture<MockApiFactory>
 {
-    private static readonly string Contract = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "openapi.v1.yaml"));
+    private static readonly string Contract = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "openapi.v1.yaml"))
+        .ReplaceLineEndings("\n"); // Windows checkouts may use CRLF; the regexes expect LF.
     private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]

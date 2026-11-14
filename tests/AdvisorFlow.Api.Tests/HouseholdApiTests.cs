@@ -3,14 +3,15 @@ using System.Net.Http.Json;
 using AdvisorFlow.Application.Abstractions;
 using AdvisorFlow.Application.Households;
 using AdvisorFlow.Domain.Households;
-using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace AdvisorFlow.Api.Tests;
 
 /// <summary>End-to-end HTTP tests against the API hosted in memory with the mock provider.</summary>
-public class HouseholdApiTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+public class HouseholdApiTests(MockApiFactory factory) : IClassFixture<MockApiFactory>
 {
     private readonly HttpClient _client = factory.CreateClient();
 
@@ -94,7 +95,8 @@ public class HouseholdApiTests(WebApplicationFactory<Program> factory) : IClassF
     [Fact]
     public async Task Salesforce_provider_without_configuration_returns_503()
     {
-        var client = factory.WithWebHostBuilder(builder => builder.UseSetting("Crm:Provider", "Salesforce")).CreateClient();
+        var client = factory.WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, config) =>
+            config.AddInMemoryCollection(new Dictionary<string, string?> { ["Crm:Provider"] = "Salesforce" }))).CreateClient();
 
         var response = await client.GetAsync("/api/households");
 
