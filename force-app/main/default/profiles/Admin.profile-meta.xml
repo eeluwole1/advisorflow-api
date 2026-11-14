@@ -425,6 +425,10 @@
     <layoutAssignments>
         <layout>Opportunity-Opportunity Layout</layout>
     </layoutAssignments>
+    <layoutAssignments>
+        <layout>Account-Account Layout</layout>
+        <recordType>Account.Household</recordType>
+    </layoutAssignments>
     <objectPermissions>
         <allowCreate>true</allowCreate>
         <allowDelete>true</allowDelete>
@@ -1352,4 +1356,9 @@
         <enabled>true</enabled>
         <name>WorkCalibrationUser</name>
     </userPermissions>
+    <recordTypeVisibilities>
+        <default>true</default>
+        <recordType>Account.Household</recordType>
+        <visible>true</visible>
+    </recordTypeVisibilities>
 </Profile>
