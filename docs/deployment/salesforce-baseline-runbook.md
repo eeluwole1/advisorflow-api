@@ -54,15 +54,35 @@ Do this in Salesforce Lightning before changing anything:
 1. Open the **James Williams** Account. Record its saved values: Type, Client Status, Client Risk Profile, Customer Priority, Phone and Account Number.
 2. Open **Contacts** and look for the test Contact created earlier. Note its name, which Account it is linked to (if any), and its Preferred Contact Method.
 3. Decide, and write down here:
-   - [ ] Is the existing test Contact actually James Williams? If so, **reuse it** and link it to the household. Do not create a second James Williams Contact (BR-HH-004).
-   - [ ] If the existing Contact is a different fictional person, keep it and decide which household it belongs to.
+   - [x] Is the existing test Contact actually James Williams? **No.** The only Contact was **Daniel Carter** (`003fj00001v2tLdAAI`, no email or contact preference), linked to the James Williams Account for testing only. Creating James Williams therefore is not a duplicate (BR-HH-004).
+   - [x] If the existing Contact is a different fictional person, keep it and decide which household it belongs to. **Decision (13 Nov 2026):** Daniel gets his own **Carter Household**. The original link to the Williams Account was a testing artifact, not evidence that he belongs to that family (BR-HH-002: one primary household per Contact).
 
 ## 6. Migrate the sample to the household model
 
-1. Choose how to identify households (ADR-002): a **Household** Account record type, or Type/classification = Household. Record the choice in `docs/architecture/decisions.md`.
-2. Rename the Account **James Williams** → **Williams Household**, and apply the household record type or classification.
-3. Make sure the James Williams Contact's Account is **Williams Household**.
-4. Retrieve again (step 3) if any metadata changed, such as a new record type, and commit.
+1. [x] Choose how to identify households (ADR-002). **Decision:** a `Household` Account record type, created in Setup (Object Manager → Account → Record Types) from `--Master--` so it inherits every picklist value, available and default for all profiles. Page layouts per profile match each profile's existing Account layout (Admin/Standard/Read Only/Marketing User → Account Layout; Custom: Sales → Account (Sales); Custom: Support → Account (Support); Custom: Marketing → Account (Marketing)).
+2. [x] Rename the Account **James Williams** → **Williams Household** and set its record type to Household.
+3. [x] Create **James Williams** as a Contact in Williams Household (fictional: 204-555-0101, james.williams@example.com, prefers Phone).
+4. [x] Create **Carter Household** (Household, Prospect) and move **Daniel Carter** into it.
+5. [x] Retrieve again and commit (`Add Household record type for Accounts`).
+
+Commands used (record ids are specific to this Developer Edition org):
+
+```powershell
+sf data query  --target-org advisorflow-dev --query "SELECT Id FROM RecordType WHERE SobjectType = 'Account' AND DeveloperName = 'Household'"
+sf data update record --target-org advisorflow-dev --sobject Account --record-id <williamsAccountId> --values "Name='Williams Household' RecordTypeId=<householdRecordTypeId>"
+sf data create record --target-org advisorflow-dev --sobject Contact --values "FirstName=James LastName=Williams AccountId=<williamsAccountId> Phone='204-555-0101' Email=james.williams@example.com Preferred_Contact_Method__c=Phone"
+sf data create record --target-org advisorflow-dev --sobject Account --values "Name='Carter Household' RecordTypeId=<householdRecordTypeId> Client_Status__c=Prospect"
+sf data update record --target-org advisorflow-dev --sobject Contact --record-id <danielContactId> --values "AccountId=<carterAccountId>"
+```
+
+Result (verified 13 Nov 2026):
+
+| Household | Record type | Client Status | Members |
+|---|---|---|---|
+| Carter Household | Household | Prospect | Daniel Carter (no preference yet) |
+| Williams Household | Household | Prospect | James Williams (Phone) |
+
+The primary-member flag (BR-HH-003) has no Salesforce field yet; it is added in M3. Until then the Salesforce provider reports `isPrimary: false`.
 
 ## 7. Prepare the OAuth integration (start of the M2 coding work)
 

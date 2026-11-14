@@ -10,7 +10,7 @@ Angular + TypeScript + Tailwind frontend, C# ASP.NET Core Web API backend, Sales
 
 - A household is a standard **Account**. Each individual member is a **Contact** with `AccountId` pointing to that household. Opportunities belong to the household Account.
 - Person Accounts are **not** enabled; once enabled, they cannot be turned off.
-- Households are identified by an Account record type or a clearly defined Account classification. Which one to use is confirmed during the M2 baseline review.
+- Households are identified by the **`Household` Account record type** (decided 13 Nov 2026, M2). It is active, the default for all profiles, and includes every Account picklist value. The Salesforce provider reads only Accounts with `RecordType.DeveloperName = 'Household'`, so business Accounts added later never appear as clients. The Account `Type` field keeps its standard meaning. Chosen over a `Type = Household` picklist value, which would have mixed household identity into a field already used for prospect/customer classification.
 - A Contact has one primary household in the MVP. Multi-household membership is out of scope.
 - **Scope:** this is a design decision for this MVP, not a claim about a universal standard for financial advisory CRMs. Revisit it if the business needs individual-client or business-client models.
 
