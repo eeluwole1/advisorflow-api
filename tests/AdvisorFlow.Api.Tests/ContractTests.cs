@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -40,6 +41,21 @@ public class ContractTests(MockApiFactory factory) : IClassFixture<MockApiFactor
     {
         using var members = await GetJson("/api/households/001MOCK00000000001/contacts");
         AssertMatchesSchema(members.RootElement[0], "HouseholdMember");
+    }
+
+    [Fact]
+    public async Task Household_create_and_update_responses_match_contract() // v1.1
+    {
+        var created = await _client.PostAsJsonAsync("/api/households", new { name = "Contract Household" });
+        Assert.Equal(System.Net.HttpStatusCode.Created, created.StatusCode);
+        using var createdBody = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        AssertMatchesSchema(createdBody.RootElement, "HouseholdDetail");
+
+        var id = createdBody.RootElement.GetProperty("id").GetString();
+        var updated = await _client.PutAsJsonAsync($"/api/households/{id}", new { name = "Contract Household", clientStatus = "Active" });
+        updated.EnsureSuccessStatusCode();
+        using var updatedBody = JsonDocument.Parse(await updated.Content.ReadAsStringAsync());
+        AssertMatchesSchema(updatedBody.RootElement, "HouseholdDetail");
     }
 
     private async Task<JsonDocument> GetJson(string url)

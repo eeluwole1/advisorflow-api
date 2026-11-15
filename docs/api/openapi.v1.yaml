@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: AdvisorFlow API
-  version: 1.0.0
+  version: 1.1.0
   summary: Household CRM API consumed by advisorflow-web.
   description: |
     Versioned contract between advisorflow-api and advisorflow-web (blueprint v1.3 §11.5A).
@@ -15,6 +15,10 @@ info:
 
     All records are fictional. `riskProfile` is a CRM classification tag, not an
     investment suitability assessment.
+
+    Changes:
+    - 1.1.0 (M3): `POST /api/households` and `PUT /api/households/{id}`. There is no
+      delete; a household is deactivated by setting `clientStatus` to `Inactive` (ADR-008).
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -70,7 +74,54 @@ paths:
         '400': { $ref: '#/components/responses/ValidationError' }
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
+    post:
+      tags: [Households]
+      operationId: createHousehold
+      summary: Create a household
+      description: Added in 1.1.0. `clientStatus` defaults to `Prospect`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/HouseholdCreate' }
+      responses:
+        '201':
+          description: The household was created.
+          headers:
+            Location:
+              description: URL of the new household.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdDetail' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /api/households/{id}:
+    put:
+      tags: [Households]
+      operationId: updateHousehold
+      summary: Replace a household's editable fields
+      description: |
+        Added in 1.1.0. Every editable field is replaced: an omitted or empty optional
+        field is cleared. Set `clientStatus` to `Inactive` to deactivate (ADR-008).
+      parameters:
+        - $ref: '#/components/parameters/HouseholdId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/HouseholdUpdate' }
+      responses:
+        '200':
+          description: The updated household.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdDetail' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
     get:
       tags: [Households]
       operationId: getHousehold
@@ -118,6 +169,37 @@ components:
     ClientStatus:
       type: string
       enum: [Prospect, Active, Inactive]
+    RiskProfile:
+      type: string
+      description: CRM classification tag only. Matching is case-insensitive on input.
+      enum: [Conservative, Moderate, Aggressive]
+    Priority:
+      type: string
+      description: Matching is case-insensitive on input.
+      enum: [High, Medium, Low]
+    HouseholdCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 255 }
+        clientStatus:
+          description: Defaults to Prospect when omitted (BR-CL-001).
+          $ref: '#/components/schemas/ClientStatus'
+        riskProfile:
+          oneOf:
+            - $ref: '#/components/schemas/RiskProfile'
+            - type: 'null'
+        priority:
+          oneOf:
+            - $ref: '#/components/schemas/Priority'
+            - type: 'null'
+        phone: { type: [string, 'null'], maxLength: 40 }
+    HouseholdUpdate:
+      description: Same fields as HouseholdCreate; `clientStatus` is required because PUT replaces every field.
+      allOf:
+        - $ref: '#/components/schemas/HouseholdCreate'
+        - type: object
+          required: [clientStatus]
     HouseholdSummary:
       type: object
       required: [id, name, clientStatus, riskProfile, priority, memberCount, primaryContactName]
@@ -182,7 +264,7 @@ components:
             items: { type: string }
   responses:
     ValidationError:
-      description: Invalid query parameter or id.
+      description: Invalid query parameter, id or request body.
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/ProblemDetails' }

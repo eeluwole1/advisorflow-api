@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using AdvisorFlow.Application.Abstractions;
 using AdvisorFlow.Application.Households;
+using AdvisorFlow.Domain.Households;
 using AdvisorFlow.Infrastructure.Crm;
 using AdvisorFlow.Infrastructure.Crm.Salesforce;
 
@@ -261,18 +262,21 @@ public class SalesforceProviderTests
         using var sf = new SalesforceHarness();
         sf.Http.OnQuery = _ => FakeSalesforce.Json(FakeSalesforce.QueryResult(
             """{"Id":"003fj00001v2tLdAAI","AccountId":"001fj00002Et3AfAAJ","FirstName":"Daniel","LastName":"Carter","Email":null,"Phone":"204-555-0102","Preferred_Contact_Method__c":null}""",
-            """{"Id":"003fj00001v8tUDAAY","AccountId":"001fj00002Eg1LbAAJ","FirstName":null,"LastName":"Williams","Email":"james.williams@example.com","Phone":"204-555-0101","Preferred_Contact_Method__c":"Phone"}"""));
+            """{"Id":"003fj00001v8tUDAAY","AccountId":"001fj00002Eg1LbAAJ","FirstName":null,"LastName":"Williams","Email":"james.williams@example.com","Phone":"204-555-0101","Preferred_Contact_Method__c":"Phone","Is_Primary_Member__c":true}"""));
 
         var members = await sf.Provider.GetMembersForHouseholdsAsync(
             ["001fj00002Eg1LbAAJ", "001fj00002Et3AfAAJ", "001fj00002EmptyAAA"], CancellationToken.None);
 
         var query = Assert.Single(sf.Http.Queries).Soql!;
         Assert.Contains("FROM Contact WHERE AccountId IN ('001fj00002Eg1LbAAJ', '001fj00002Et3AfAAJ', '001fj00002EmptyAAA')", query);
+        Assert.Contains("Is_Primary_Member__c", query);
+        Assert.Contains("ORDER BY Is_Primary_Member__c DESC", query);
         Assert.Equal("Daniel", Assert.Single(members["001fj00002Et3AfAAJ"]).FirstName);
         var williams = Assert.Single(members["001fj00002Eg1LbAAJ"]);
         Assert.Equal(string.Empty, williams.FirstName);
         Assert.Equal("Phone", williams.PreferredContactMethod);
-        Assert.False(williams.IsPrimary);
+        Assert.True(williams.IsPrimary);
+        Assert.False(members["001fj00002Et3AfAAJ"][0].IsPrimary); // field missing from the record → false
         Assert.Empty(members["001fj00002EmptyAAA"]);
     }
 
@@ -285,5 +289,93 @@ public class SalesforceProviderTests
 
         Assert.Empty(members);
         Assert.Empty(sf.Http.Requests);
+    }
+
+    private static readonly HouseholdDraft Draft = new("Okafor Household", "Active", "Conservative", null, "204-555-0199");
+
+    private const string NewAccount =
+        """{"Id":"001fj00002NewAcAAA","Name":"Okafor Household","Client_Status__c":"Active","Client_Risk_Profile__c":"Conservative","CustomerPriority__c":null,"Phone":"204-555-0199","AccountNumber":null}""";
+
+    private static HttpResponseMessage AnswerCreateQueries(FakeRequest r) => FakeSalesforce.Json(
+        r.Soql!.Contains("FROM RecordType", StringComparison.Ordinal)
+            ? FakeSalesforce.QueryResult("""{"Id":"012fj000009BFeTAAW"}""")
+            : FakeSalesforce.QueryResult(NewAccount));
+
+    [Fact]
+    public async Task Creates_a_household_Account_with_the_Household_record_type()
+    {
+        using var sf = new SalesforceHarness();
+        sf.Http.OnQuery = AnswerCreateQueries;
+
+        var created = await sf.Provider.CreateHouseholdAsync(Draft, CancellationToken.None);
+
+        Assert.Equal(FakeSalesforce.NewAccountId, created.Id);
+        Assert.Equal("Okafor Household", created.Name);
+        var write = Assert.Single(sf.Http.Writes);
+        Assert.Equal(HttpMethod.Post, write.Method);
+        Assert.Equal($"{FakeSalesforce.InstanceUrl}/services/data/v68.0/sobjects/Account", write.Uri.ToString());
+        using var body = JsonDocument.Parse(write.Body);
+        Assert.Equal("012fj000009BFeTAAW", body.RootElement.GetProperty("RecordTypeId").GetString());
+        Assert.Equal("Okafor Household", body.RootElement.GetProperty("Name").GetString());
+        Assert.Equal("Active", body.RootElement.GetProperty("Client_Status__c").GetString());
+        Assert.Equal("Conservative", body.RootElement.GetProperty("Client_Risk_Profile__c").GetString());
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("CustomerPriority__c").ValueKind);
+        Assert.Equal("204-555-0199", body.RootElement.GetProperty("Phone").GetString());
+    }
+
+    [Fact]
+    public async Task Looks_up_the_Household_record_type_only_once()
+    {
+        using var sf = new SalesforceHarness();
+        sf.Http.OnQuery = AnswerCreateQueries;
+
+        await sf.Provider.CreateHouseholdAsync(Draft, CancellationToken.None);
+        await sf.Provider.CreateHouseholdAsync(Draft, CancellationToken.None);
+
+        Assert.Single(sf.Http.Queries, q => q.Soql!.Contains("FROM RecordType", StringComparison.Ordinal));
+        Assert.Equal(2, sf.Http.Writes.Count());
+    }
+
+    [Fact]
+    public async Task Updates_a_household_and_sends_nulls_to_clear_fields()
+    {
+        using var sf = new SalesforceHarness();
+        sf.Http.OnQuery = _ => FakeSalesforce.Json(FakeSalesforce.QueryResult(Williams));
+        var draft = new HouseholdDraft("Williams Household", "Inactive", null, null, null);
+
+        var updated = await sf.Provider.UpdateHouseholdAsync("001fj00002Eg1LbAAJ", draft, CancellationToken.None);
+
+        Assert.NotNull(updated);
+        var write = Assert.Single(sf.Http.Writes);
+        Assert.Equal(HttpMethod.Patch, write.Method);
+        Assert.Equal($"{FakeSalesforce.InstanceUrl}/services/data/v68.0/sobjects/Account/001fj00002Eg1LbAAJ", write.Uri.ToString());
+        using var body = JsonDocument.Parse(write.Body);
+        Assert.Equal("Inactive", body.RootElement.GetProperty("Client_Status__c").GetString());
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("Client_Risk_Profile__c").ValueKind);
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("Phone").ValueKind);
+        Assert.False(body.RootElement.TryGetProperty("RecordTypeId", out _));
+    }
+
+    [Fact]
+    public async Task Updating_something_that_is_not_a_household_changes_nothing()
+    {
+        using var sf = new SalesforceHarness();
+        sf.Http.OnQuery = _ => FakeSalesforce.Json(FakeSalesforce.QueryResult()); // not found as a Household
+
+        var updated = await sf.Provider.UpdateHouseholdAsync("001fj00002OtherAAA", Draft, CancellationToken.None);
+
+        Assert.Null(updated);
+        Assert.Empty(sf.Http.Writes);
+    }
+
+    [Fact]
+    public async Task A_write_Salesforce_rejects_is_a_502()
+    {
+        using var sf = new SalesforceHarness();
+        sf.Http.OnQuery = AnswerCreateQueries;
+        sf.Http.OnWrite = _ => FakeSalesforce.Json(
+            FakeSalesforce.Error("FIELD_CUSTOM_VALIDATION_EXCEPTION", "rejected"), HttpStatusCode.BadRequest);
+
+        await Assert.ThrowsAsync<CrmUpstreamException>(() => sf.Provider.CreateHouseholdAsync(Draft, CancellationToken.None));
     }
 }

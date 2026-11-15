@@ -6,7 +6,7 @@ namespace AdvisorFlow.Application.Abstractions;
 /// <summary>
 /// The boundary between the application and the CRM system of record.
 /// Infrastructure supplies a mock provider (local development) and a Salesforce
-/// provider (M2). Implementations return null for "not found" and throw
+/// provider (M2). Writes were added in M3. Implementations return null for "not found" and throw
 /// <see cref="CrmUnavailableException"/> or <see cref="CrmUpstreamException"/>
 /// for integration failures.
 /// </summary>
@@ -22,6 +22,12 @@ public interface ICrmDataProvider
     /// <summary>Members of several households in one round trip, for list views.</summary>
     Task<IReadOnlyDictionary<string, IReadOnlyList<HouseholdMember>>> GetMembersForHouseholdsAsync(
         IReadOnlyCollection<string> householdIds, CancellationToken ct);
+
+    /// <summary>Creates a household and returns it as stored.</summary>
+    Task<Household> CreateHouseholdAsync(HouseholdDraft draft, CancellationToken ct);
+
+    /// <summary>Replaces the editable fields of a household. Returns null when it does not exist.</summary>
+    Task<Household?> UpdateHouseholdAsync(string id, HouseholdDraft draft, CancellationToken ct);
 }
 
 /// <summary>The CRM cannot be reached or is not configured. The API maps this to HTTP 503.</summary>

@@ -34,11 +34,21 @@ public sealed class FakeSalesforce : HttpMessageHandler, IHttpClientFactory
 
     public IEnumerable<FakeRequest> Queries => Requests.Where(r => r.Soql is not null);
 
+    /// <summary>Record creates and updates (<c>/sobjects/...</c>).</summary>
+    public IEnumerable<FakeRequest> Writes => Requests.Where(r => r.Uri.AbsolutePath.Contains("/sobjects/", StringComparison.Ordinal));
+
+    public const string NewAccountId = "001fj00002NewAcAAA";
+
     /// <summary>Answers token requests; by default issues token-1, token-2, ...</summary>
     public Func<FakeRequest, HttpResponseMessage> OnToken { get; set; }
 
     /// <summary>Answers query requests; by default an empty result.</summary>
     public Func<FakeRequest, HttpResponseMessage> OnQuery { get; set; } = _ => Json(QueryResult());
+
+    /// <summary>Answers creates (201 with <see cref="NewAccountId"/>) and updates (204) by default.</summary>
+    public Func<FakeRequest, HttpResponseMessage> OnWrite { get; set; } = r => r.Method == HttpMethod.Post
+        ? Json($$"""{"id":"{{NewAccountId}}","success":true,"errors":[]}""", HttpStatusCode.Created)
+        : new HttpResponseMessage(HttpStatusCode.NoContent);
 
     public FakeSalesforce() =>
         OnToken = _ => Json($$"""{"access_token":"token-{{++_tokens}}","instance_url":"{{InstanceUrl}}","token_type":"Bearer"}""");
@@ -50,7 +60,12 @@ public sealed class FakeSalesforce : HttpMessageHandler, IHttpClientFactory
         var body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(ct);
         var captured = new FakeRequest(request.Method, request.RequestUri!, request.Headers.Authorization?.ToString(), body);
         Requests.Add(captured);
-        return captured.Soql is null ? OnToken(captured) : OnQuery(captured);
+        if (captured.Uri.AbsolutePath == "/services/oauth2/token")
+        {
+            return OnToken(captured);
+        }
+
+        return captured.Soql is not null ? OnQuery(captured) : OnWrite(captured);
     }
 
     public static HttpResponseMessage Json(string json, HttpStatusCode status = HttpStatusCode.OK) =>
@@ -95,7 +110,7 @@ public sealed class SalesforceHarness : IDisposable
         var options = Microsoft.Extensions.Options.Options.Create(Options);
         Authenticator = new SalesforceAuthenticator(Http, options, Clock, NullLogger<SalesforceAuthenticator>.Instance);
         Provider = new SalesforceCrmDataProvider(
-            new SalesforceQueryClient(Http, Authenticator, options, NullLogger<SalesforceQueryClient>.Instance));
+            new SalesforceRestClient(Http, Authenticator, options, NullLogger<SalesforceRestClient>.Instance));
     }
 
     public static RSA PublicKey => SharedKey.Value;

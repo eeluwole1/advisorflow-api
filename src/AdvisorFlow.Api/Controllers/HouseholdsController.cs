@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AdvisorFlow.Api.Controllers;
 
-/// <summary>Read-only household endpoints (blueprint §11.7, milestone M1).</summary>
+/// <summary>Household endpoints: reads (M1, blueprint §11.7) and household create/update (M3, contract v1.1).</summary>
 [ApiController]
 [Route("api/households")]
 public sealed class HouseholdsController(HouseholdService households) : ControllerBase
@@ -59,6 +59,47 @@ public sealed class HouseholdsController(HouseholdService households) : Controll
 
         var members = await households.GetMembersAsync(id, ct);
         return members is null ? HouseholdNotFound() : Ok(members);
+    }
+
+    /// <summary>Creates a household. Client Status defaults to Prospect.</summary>
+    [HttpPost]
+    [ProducesResponseType<HouseholdDetailDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Create([FromBody] HouseholdWriteRequest? request, CancellationToken ct)
+    {
+        var errors = HouseholdService.ValidateHousehold(request, isCreate: true, out var draft);
+        if (errors.Count > 0)
+        {
+            return ValidationProblem(new ValidationProblemDetails(errors));
+        }
+
+        var created = await households.CreateHouseholdAsync(draft!, ct);
+        return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
+    }
+
+    /// <summary>
+    /// Replaces a household's editable fields (empty optional fields are cleared).
+    /// There is no delete: set Client Status to Inactive to deactivate (ADR-008).
+    /// </summary>
+    [HttpPut("{id}")]
+    [ProducesResponseType<HouseholdDetailDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Update(string id, [FromBody] HouseholdWriteRequest? request, CancellationToken ct)
+    {
+        if (!HouseholdService.IsValidRecordId(id))
+        {
+            return InvalidId();
+        }
+
+        var errors = HouseholdService.ValidateHousehold(request, isCreate: false, out var draft);
+        if (errors.Count > 0)
+        {
+            return ValidationProblem(new ValidationProblemDetails(errors));
+        }
+
+        var updated = await households.UpdateHouseholdAsync(id, draft!, ct);
+        return updated is null ? HouseholdNotFound() : Ok(updated);
     }
 
     private IActionResult InvalidId() => ValidationProblem(new ValidationProblemDetails(

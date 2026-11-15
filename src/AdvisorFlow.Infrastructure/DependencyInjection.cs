@@ -23,7 +23,7 @@ public static class DependencyInjection
         services.AddHttpClient(SalesforceAuthenticator.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(30));
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<SalesforceAuthenticator>();
-        services.AddSingleton<SalesforceQueryClient>();
+        services.AddSingleton<SalesforceRestClient>();
         services.AddSingleton<SalesforceCrmDataProvider>();
         services.AddSingleton<MockCrmDataProvider>();
 

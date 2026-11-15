@@ -21,7 +21,7 @@ const string FrontendCors = "Frontend";
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddPolicy(FrontendCors, policy => policy
     .WithOrigins(allowedOrigins)
-    .WithMethods("GET")
+    .WithMethods("GET", "POST", "PUT") // No DELETE: households are deactivated, not deleted (ADR-008).
     .AllowAnyHeader()));
 
 var app = builder.Build();

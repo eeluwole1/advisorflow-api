@@ -1,4 +1,4 @@
-# API guide (contract v1.0.0, read-only)
+# API guide (contract v1.1.0)
 
 The authoritative contract is [`openapi.v1.yaml`](openapi.v1.yaml), which `advisorflow-web` builds against. This page is a quick human-readable summary. If the two ever differ, the YAML wins, and `ContractTests` should catch the difference.
 
@@ -10,6 +10,10 @@ Base URL (local): `http://localhost:5080`. All responses are JSON. Errors use [R
 | GET | `/api/households` | `200` `PagedResponse<HouseholdSummary>` | `400`, `502`, `503` |
 | GET | `/api/households/{id}` | `200` `HouseholdDetail` | `400`, `404`, `502`, `503` |
 | GET | `/api/households/{id}/contacts` | `200` `HouseholdMember[]` (primary first) | `400`, `404`, `502`, `503` |
+| POST | `/api/households` (1.1) | `201` `HouseholdDetail` + `Location` header | `400`, `502`, `503` |
+| PUT | `/api/households/{id}` (1.1) | `200` `HouseholdDetail` | `400`, `404`, `502`, `503` |
+
+There is no `DELETE`. A household is deactivated by setting `clientStatus` to `Inactive` (ADR-008).
 
 ## Query parameters for `GET /api/households`
 
@@ -20,17 +24,32 @@ Base URL (local): `http://localhost:5080`. All responses are JSON. Errors use [R
 | `search` | — | Case-insensitive match on household name; ≤ 80 characters |
 | `status` | — | `Prospect`, `Active` or `Inactive` (BR-CL-001) |
 
+## Body for `POST` and `PUT /api/households`
+
+```jsonc
+{ "name": "Okafor Household",      // required, 1–255 characters (trimmed)
+  "clientStatus": "Active",        // Prospect | Active | Inactive. POST: defaults to Prospect. PUT: required
+  "riskProfile": "Conservative",   // Conservative | Moderate | Aggressive, or null
+  "priority": "High",              // High | Medium | Low, or null
+  "phone": "204-555-0199" }        // ≤ 40 characters, or null
+```
+
+- Picklist values are matched case-insensitively and returned in their exact spelling (`"active"` → `"Active"`).
+- **PUT replaces every editable field:** an omitted or empty optional field is cleared. Send the whole form.
+- `id` and `accountNumber` cannot be changed.
+
 `{id}` must be a 15- or 18-character alphanumeric Salesforce record id; anything else returns `400`. This also keeps malformed input out of future SOQL queries.
 
 ## Status codes
 
 | Code | Meaning |
 |---|---|
-| 400 | Invalid query parameter or id. `errors` lists each field. |
-| 404 | Household does not exist (or is not visible to the caller, once authorization arrives in M3). |
+| 400 | Invalid query parameter, id or request body. `errors` lists each field. |
+| 404 | Household does not exist (or is not a household). |
 | 502 | The CRM returned an error or unusable data. |
 | 503 | The CRM is unreachable or the provider is not configured. |
-| 401 / 403 | Reserved for M3, when user authentication is added. |
+| 405 | Method not supported, for example `DELETE` (ADR-008). |
+| 401 / 403 | Reserved for M7, when advisor sign-in is added (ADR-008). |
 
 ## Shapes
 
@@ -53,6 +72,4 @@ Base URL (local): `http://localhost:5080`. All responses are JSON. Errors use [R
 { "items": [ /* T */ ], "page": 1, "pageSize": 20, "totalCount": 7, "totalPages": 1 }
 ```
 
-`riskProfile` is a CRM classification tag. It is **not** an investment suitability assessment. `isPrimary` is supplied by the mock provider. In Salesforce it depends on a custom field that is still pending (BR-HH-003); until that field exists, the Salesforce provider returns `false`.
-
-POST and PUT endpoints are added in M3, only after authorization, validation and write behavior are tested.
+`riskProfile` is a CRM classification tag. It is **not** an investment suitability assessment. `isPrimary` comes from the Contact field `Is_Primary_Member__c` in Salesforce (BR-HH-003). Member create/update and the one-primary rule follow in the next part of M3.

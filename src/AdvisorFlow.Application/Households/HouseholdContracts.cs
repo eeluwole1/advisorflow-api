@@ -44,6 +44,17 @@ public sealed record HouseholdMemberDto(
     string? PreferredContactMethod,
     bool IsPrimary);
 
+/// <summary>
+/// Body of <c>POST /api/households</c> and <c>PUT /api/households/{id}</c> (contract v1.1).
+/// PUT replaces every editable field: an omitted or empty optional field is cleared.
+/// </summary>
+public sealed record HouseholdWriteRequest(
+    string? Name,
+    string? ClientStatus,
+    string? RiskProfile,
+    string? Priority,
+    string? Phone);
+
 public sealed record PagedResponse<T>(
     IReadOnlyList<T> Items,
     int Page,

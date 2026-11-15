@@ -7,12 +7,12 @@ using AdvisorFlow.Infrastructure.Crm.Salesforce;
 namespace AdvisorFlow.Infrastructure.Crm;
 
 /// <summary>
-/// Reads households (Accounts with the Household record type, ADR-002) and their
-/// members (Contacts) from Salesforce, as the read-only integration user.
+/// Reads and writes households (Accounts with the Household record type, ADR-002) and
+/// reads their members (Contacts) in Salesforce, as the integration user (ADR-007, ADR-008).
 /// Behaves like <see cref="MockCrmDataProvider"/>: same filters, ordering and paging,
 /// so the API contract and the web app do not change when the provider does.
 /// </summary>
-public sealed class SalesforceCrmDataProvider(SalesforceQueryClient salesforce) : ICrmDataProvider
+public sealed class SalesforceCrmDataProvider(SalesforceRestClient salesforce) : ICrmDataProvider
 {
     /// <summary>SOQL rejects OFFSET values above 2,000. Pages beyond it come back empty.</summary>
     public const int MaxOffset = 2000;
@@ -23,9 +23,11 @@ public sealed class SalesforceCrmDataProvider(SalesforceQueryClient salesforce) 
         "Id, Name, Client_Status__c, Client_Risk_Profile__c, CustomerPriority__c, Phone, AccountNumber";
 
     private const string MemberFields =
-        "Id, AccountId, FirstName, LastName, Email, Phone, Preferred_Contact_Method__c";
+        "Id, AccountId, FirstName, LastName, Email, Phone, Preferred_Contact_Method__c, Is_Primary_Member__c";
 
     private const string IsHousehold = "RecordType.DeveloperName = 'Household'";
+
+    private string? _householdRecordTypeId;
 
     public async Task<PagedResult<Household>> GetHouseholdsAsync(HouseholdQuery query, CancellationToken ct)
     {
@@ -81,7 +83,7 @@ public sealed class SalesforceCrmDataProvider(SalesforceQueryClient salesforce) 
         {
             var records = await salesforce.QueryAsync<ContactRecord>(
                 $"SELECT {MemberFields} FROM Contact WHERE AccountId IN ({Soql.QuoteList(chunk)}) " +
-                "ORDER BY LastName ASC, FirstName ASC, Id ASC", ct);
+                "ORDER BY Is_Primary_Member__c DESC, LastName ASC, FirstName ASC, Id ASC", ct);
 
             foreach (var record in records)
             {
@@ -94,6 +96,53 @@ public sealed class SalesforceCrmDataProvider(SalesforceQueryClient salesforce) 
 
         return byHousehold.ToDictionary(
             pair => pair.Key, pair => (IReadOnlyList<HouseholdMember>)pair.Value, StringComparer.Ordinal);
+    }
+
+    public async Task<Household> CreateHouseholdAsync(HouseholdDraft draft, CancellationToken ct)
+    {
+        var fields = ToAccountFields(draft);
+        fields["RecordTypeId"] = await GetHouseholdRecordTypeIdAsync(ct);
+
+        var id = await salesforce.CreateAsync("Account", fields, ct);
+        return await GetHouseholdAsync(id, ct)
+            ?? throw new CrmUpstreamException("The new household could not be read back from Salesforce.");
+    }
+
+    public async Task<Household?> UpdateHouseholdAsync(string id, HouseholdDraft draft, CancellationToken ct)
+    {
+        // Only Household Accounts can be changed through this API; anything else is "not found".
+        if (await GetHouseholdAsync(id, ct) is null)
+        {
+            return null;
+        }
+
+        await salesforce.UpdateAsync("Account", id, ToAccountFields(draft), ct);
+        return await GetHouseholdAsync(id, ct);
+    }
+
+    /// <summary>Editable Account fields. Null values clear the field (PUT semantics).</summary>
+    private static Dictionary<string, object?> ToAccountFields(HouseholdDraft draft) => new()
+    {
+        ["Name"] = draft.Name,
+        ["Client_Status__c"] = draft.ClientStatus,
+        ["Client_Risk_Profile__c"] = draft.RiskProfile,
+        ["CustomerPriority__c"] = draft.Priority,
+        ["Phone"] = draft.Phone,
+    };
+
+    /// <summary>The org's Id of the Account record type "Household", looked up once and cached.</summary>
+    private async Task<string> GetHouseholdRecordTypeIdAsync(CancellationToken ct)
+    {
+        if (_householdRecordTypeId is { } cached)
+        {
+            return cached;
+        }
+
+        var records = await salesforce.QueryAsync<RecordTypeRecord>(
+            "SELECT Id FROM RecordType WHERE SobjectType = 'Account' AND DeveloperName = 'Household' LIMIT 1", ct);
+        return _householdRecordTypeId = records.Count == 1
+            ? records[0].Id
+            : throw new CrmUpstreamException("The Account record type 'Household' was not found in Salesforce.");
     }
 
     /// <summary>The WHERE clause for the household list. User input is escaped (see <see cref="Soql"/>).</summary>
@@ -122,10 +171,9 @@ public sealed class SalesforceCrmDataProvider(SalesforceQueryClient salesforce) 
         r.Id, r.Name ?? string.Empty, r.ClientStatus ?? ClientStatuses.Prospect,
         r.RiskProfile, r.Priority, r.Phone, r.AccountNumber);
 
-    // The primary-member flag (BR-HH-003) has no Salesforce field until M3.
     private static HouseholdMember ToMember(ContactRecord r, string householdId) => new(
         r.Id, householdId, r.FirstName ?? string.Empty, r.LastName ?? string.Empty,
-        r.Email, r.Phone, r.PreferredContactMethod, IsPrimary: false);
+        r.Email, r.Phone, r.PreferredContactMethod, r.IsPrimary == true);
 
     private sealed record AccountRecord(
         [property: JsonPropertyName("Id")] string Id,
@@ -143,5 +191,8 @@ public sealed class SalesforceCrmDataProvider(SalesforceQueryClient salesforce) 
         [property: JsonPropertyName("LastName")] string? LastName,
         [property: JsonPropertyName("Email")] string? Email,
         [property: JsonPropertyName("Phone")] string? Phone,
-        [property: JsonPropertyName("Preferred_Contact_Method__c")] string? PreferredContactMethod);
+        [property: JsonPropertyName("Preferred_Contact_Method__c")] string? PreferredContactMethod,
+        [property: JsonPropertyName("Is_Primary_Member__c")] bool? IsPrimary);
+
+    private sealed record RecordTypeRecord([property: JsonPropertyName("Id")] string Id);
 }

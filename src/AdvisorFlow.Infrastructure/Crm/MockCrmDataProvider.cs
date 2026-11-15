@@ -9,10 +9,12 @@ namespace AdvisorFlow.Infrastructure.Crm;
 /// All names, phone numbers (555 range) and emails (example.com) are fictional.
 /// Ids imitate Salesforce Account (001) and Contact (003) key prefixes so the
 /// frontend never relies on a different id shape.
+/// Each instance starts from the same seed data and keeps its own changes in memory
+/// (lost on restart), so tests and local runs never affect each other.
 /// </summary>
 public sealed class MockCrmDataProvider : ICrmDataProvider
 {
-    private static readonly IReadOnlyList<Household> Households =
+    private static readonly IReadOnlyList<Household> SeedHouseholds =
     [
         new("001MOCK00000000001", "Williams Household", ClientStatuses.Prospect, "Moderate", "Medium", "204-555-0101", "ADV-0001"),
         new("001MOCK00000000002", "Okafor Household", ClientStatuses.Active, "Conservative", "High", "204-555-0102", "ADV-0002"),
@@ -23,7 +25,7 @@ public sealed class MockCrmDataProvider : ICrmDataProvider
         new("001MOCK00000000007", "Martin Household", ClientStatuses.Active, null, "Medium", null, "ADV-0007"),
     ];
 
-    private static readonly IReadOnlyList<HouseholdMember> Members =
+    private static readonly IReadOnlyList<HouseholdMember> SeedMembers =
     [
         new("003MOCK00000000001", "001MOCK00000000001", "James", "Williams", "james.williams@example.com", "204-555-0101", "Phone", true),
         new("003MOCK00000000002", "001MOCK00000000001", "Sarah", "Williams", "sarah.williams@example.com", "204-555-0111", "Email", false),
@@ -38,6 +40,21 @@ public sealed class MockCrmDataProvider : ICrmDataProvider
         new("003MOCK00000000011", "001MOCK00000000006", "Jaspreet", "Singh", "jaspreet.singh@example.com", "204-555-0116", "Email", false),
         // Martin Household intentionally has no members (empty-state case).
     ];
+
+    private readonly Lock _lock = new();
+    private readonly List<Household> _households = [.. SeedHouseholds];
+    private readonly List<HouseholdMember> _members = [.. SeedMembers];
+    private int _nextHousehold = SeedHouseholds.Count + 1;
+
+    private List<Household> Households
+    {
+        get { lock (_lock) { return [.. _households]; } }
+    }
+
+    private List<HouseholdMember> Members
+    {
+        get { lock (_lock) { return [.. _members]; } }
+    }
 
     public Task<PagedResult<Household>> GetHouseholdsAsync(HouseholdQuery query, CancellationToken ct)
     {
@@ -86,12 +103,50 @@ public sealed class MockCrmDataProvider : ICrmDataProvider
     public Task<IReadOnlyDictionary<string, IReadOnlyList<HouseholdMember>>> GetMembersForHouseholdsAsync(
         IReadOnlyCollection<string> householdIds, CancellationToken ct)
     {
+        var members = Members;
         IReadOnlyDictionary<string, IReadOnlyList<HouseholdMember>> result = householdIds
             .Distinct()
             .ToDictionary(
                 id => id,
-                id => (IReadOnlyList<HouseholdMember>)Members.Where(m => m.HouseholdId == id).ToList());
+                id => (IReadOnlyList<HouseholdMember>)members.Where(m => m.HouseholdId == id).ToList());
 
         return Task.FromResult(result);
+    }
+
+    public Task<Household> CreateHouseholdAsync(HouseholdDraft draft, CancellationToken ct)
+    {
+        lock (_lock)
+        {
+            // 001MOCK + 11 digits = 18 characters, like a Salesforce Account id.
+            var household = new Household(
+                $"001MOCK{_nextHousehold++:D11}", draft.Name, draft.ClientStatus,
+                draft.RiskProfile, draft.Priority, draft.Phone, AccountNumber: null);
+            _households.Add(household);
+            return Task.FromResult(household);
+        }
+    }
+
+    public Task<Household?> UpdateHouseholdAsync(string id, HouseholdDraft draft, CancellationToken ct)
+    {
+        lock (_lock)
+        {
+            var index = _households.FindIndex(h => h.Id == id);
+            if (index < 0)
+            {
+                return Task.FromResult<Household?>(null);
+            }
+
+            // Id and Account Number are not editable through the API.
+            var updated = _households[index] with
+            {
+                Name = draft.Name,
+                ClientStatus = draft.ClientStatus,
+                RiskProfile = draft.RiskProfile,
+                Priority = draft.Priority,
+                Phone = draft.Phone,
+            };
+            _households[index] = updated;
+            return Task.FromResult<Household?>(updated);
+        }
     }
 }
