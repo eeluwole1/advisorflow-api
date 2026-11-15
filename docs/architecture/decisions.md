@@ -61,3 +61,10 @@ The API reads Salesforce as one dedicated **integration user**, signing in with 
 - **Token reuse:** the access token is cached and renewed after 30 minutes or on a 401, to stay within Developer Edition API limits.
 - **Trade-off:** every API caller sees the same data, because Salesforce sees one user. Per-advisor visibility (each advisor sees their own households) would need user-level OAuth or filtering in the API, and is out of scope for the MVP.
 - **Failure mapping:** sign-in or network failures and Salesforce 5xx/429 become `503`; rejected queries or unreadable responses become `502`. Salesforce error details are logged, never returned.
+
+## ADR-008: Write scope and access for M3 (household management)
+**Status:** Approved, 14 Nov 2026
+
+- **No hard delete.** Households are deactivated by setting Client Status to Inactive, which keeps history and the audit trail. The API exposes no `DELETE` for households. Removing a member from a household is decided with the member endpoints.
+- **Separate write permission set.** Writes use a new permission set, `AdvisorFlow API Write` (Create and Edit on Account and Contact, only the fields the API writes; no Delete, no Modify All). `AdvisorFlow API Read` stays read-only, so write access can be revoked on its own.
+- **Acting advisor deferred to M7.** M3 has no app sign-in, so every change reaches Salesforce as the integration user and Salesforce's *Last Modified By* shows that user. Recording the acting advisor (Microsoft Entra sign-in and audit fields) is added with deployment in M7. Until then the prototype is single-user and uses fictional data only.
