@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using AdvisorFlow.Application.Abstractions;
 using AdvisorFlow.Application.Households;
@@ -7,8 +8,9 @@ using AdvisorFlow.Infrastructure.Crm.Salesforce;
 namespace AdvisorFlow.Infrastructure.Crm;
 
 /// <summary>
-/// Reads and writes households (Accounts with the Household record type, ADR-002) and
-/// reads their members (Contacts) in Salesforce, as the integration user (ADR-007, ADR-008).
+/// Reads and writes households (Accounts with the Household record type, ADR-002) and their
+/// members (Contacts) in Salesforce, as the integration user (ADR-007, ADR-008). Member changes
+/// that move the primary flag run as one all-or-nothing composite request (BR-HH-003).
 /// Behaves like <see cref="MockCrmDataProvider"/>: same filters, ordering and paging,
 /// so the API contract and the web app do not change when the provider does.
 /// </summary>
@@ -120,6 +122,80 @@ public sealed class SalesforceCrmDataProvider(SalesforceRestClient salesforce) :
         return await GetHouseholdAsync(id, ct);
     }
 
+    public async Task<HouseholdMember> CreateMemberAsync(string householdId, MemberDraft draft, CancellationToken ct)
+    {
+        var steps = draft.IsPrimary ? await ClearPrimaryStepsAsync(householdId, exceptMemberId: null, ct) : [];
+        var fields = ToContactFields(draft);
+        fields["AccountId"] = householdId;
+        steps.Add(new CompositeSubrequest("POST", salesforce.SObjectPath("Contact"), "member", fields));
+
+        var results = await salesforce.CompositeAsync(steps, ct);
+        var created = results.First(r => r.ReferenceId == "member").Body;
+        var id = created.ValueKind == JsonValueKind.Object && created.TryGetProperty("id", out var idProperty)
+            ? idProperty.GetString()
+            : null;
+
+        return (id is null ? null : await GetMemberAsync(householdId, id, ct))
+            ?? throw new CrmUpstreamException("The new member could not be read back from Salesforce.");
+    }
+
+    public async Task<HouseholdMember?> UpdateMemberAsync(
+        string householdId, string memberId, MemberDraft draft, CancellationToken ct)
+    {
+        if (await GetMemberAsync(householdId, memberId, ct) is null)
+        {
+            return null;
+        }
+
+        var steps = draft.IsPrimary ? await ClearPrimaryStepsAsync(householdId, memberId, ct) : [];
+        steps.Add(new CompositeSubrequest("PATCH", salesforce.SObjectPath("Contact", memberId), "member", ToContactFields(draft)));
+
+        await salesforce.CompositeAsync(steps, ct);
+        return await GetMemberAsync(householdId, memberId, ct);
+    }
+
+    /// <summary>A member of the household, or null when the id is not a Contact of that household.</summary>
+    private async Task<HouseholdMember?> GetMemberAsync(string householdId, string memberId, CancellationToken ct)
+    {
+        try
+        {
+            var records = await salesforce.QueryAsync<ContactRecord>(
+                $"SELECT {MemberFields} FROM Contact WHERE Id = {Soql.Quote(memberId)} " +
+                $"AND AccountId = {Soql.Quote(householdId)} LIMIT 1", ct);
+            return records.Count == 0 ? null : ToMember(records[0], householdId);
+        }
+        catch (SalesforceInvalidIdException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Composite steps that un-set the household's other primary members.</summary>
+    private async Task<List<CompositeSubrequest>> ClearPrimaryStepsAsync(
+        string householdId, string? exceptMemberId, CancellationToken ct)
+    {
+        var current = await salesforce.QueryAsync<IdRecord>(
+            $"SELECT Id FROM Contact WHERE AccountId = {Soql.Quote(householdId)} AND Is_Primary_Member__c = true", ct);
+
+        return current
+            .Where(c => !string.Equals(c.Id, exceptMemberId, StringComparison.Ordinal))
+            .Select((c, i) => new CompositeSubrequest(
+                "PATCH", salesforce.SObjectPath("Contact", c.Id), $"clearPrimary{i}",
+                new Dictionary<string, object?> { ["Is_Primary_Member__c"] = false }))
+            .ToList();
+    }
+
+    /// <summary>Editable Contact fields. Null values clear the field (PUT semantics).</summary>
+    private static Dictionary<string, object?> ToContactFields(MemberDraft draft) => new()
+    {
+        ["FirstName"] = draft.FirstName,
+        ["LastName"] = draft.LastName,
+        ["Email"] = draft.Email,
+        ["Phone"] = draft.Phone,
+        ["Preferred_Contact_Method__c"] = draft.PreferredContactMethod,
+        ["Is_Primary_Member__c"] = draft.IsPrimary,
+    };
+
     /// <summary>Editable Account fields. Null values clear the field (PUT semantics).</summary>
     private static Dictionary<string, object?> ToAccountFields(HouseholdDraft draft) => new()
     {
@@ -195,4 +271,6 @@ public sealed class SalesforceCrmDataProvider(SalesforceRestClient salesforce) :
         [property: JsonPropertyName("Is_Primary_Member__c")] bool? IsPrimary);
 
     private sealed record RecordTypeRecord([property: JsonPropertyName("Id")] string Id);
+
+    private sealed record IdRecord([property: JsonPropertyName("Id")] string Id);
 }

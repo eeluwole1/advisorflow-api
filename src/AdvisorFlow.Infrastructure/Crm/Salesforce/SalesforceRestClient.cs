@@ -9,6 +9,12 @@ using Microsoft.Extensions.Options;
 
 namespace AdvisorFlow.Infrastructure.Crm.Salesforce;
 
+/// <summary>One step of a composite request: a REST call, its body, and a name to find its result by.</summary>
+public sealed record CompositeSubrequest(string Method, string Url, string ReferenceId, IReadOnlyDictionary<string, object?> Body);
+
+/// <summary>The result of one composite step; <see cref="Body"/> is the step's response JSON (if any).</summary>
+public sealed record CompositeResult(string ReferenceId, int HttpStatusCode, JsonElement Body);
+
 /// <summary>Salesforce reported that a record id in the query is not a valid id.
 /// The provider turns this into "not found"; anywhere else it is a 502.</summary>
 public sealed class SalesforceInvalidIdException(string message) : CrmUpstreamException(message);
@@ -69,6 +75,43 @@ public sealed class SalesforceRestClient(
             ? id
             : throw new CrmUpstreamException($"Salesforce did not confirm the new {sobject} record.");
     }
+
+    /// <summary>REST path of an sObject collection or record, for composite steps.</summary>
+    public string SObjectPath(string sobject, string? id = null) =>
+        id is null
+            ? $"/services/data/{_apiVersion}/sobjects/{sobject}"
+            : $"/services/data/{_apiVersion}/sobjects/{sobject}/{Uri.EscapeDataString(id)}";
+
+    /// <summary>
+    /// Runs up to 25 steps as one all-or-nothing transaction (Composite API, <c>allOrNone: true</c>):
+    /// if any step fails, Salesforce rolls back the others and this throws.
+    /// </summary>
+    public async Task<IReadOnlyList<CompositeResult>> CompositeAsync(IReadOnlyList<CompositeSubrequest> steps, CancellationToken ct)
+    {
+        var body = new { allOrNone = true, compositeRequest = steps };
+        var response = await SendAsync<CompositeResponse>(HttpMethod.Post, $"/services/data/{_apiVersion}/composite", body, ct)
+            ?? throw new CrmUpstreamException("Salesforce returned an empty composite response.");
+
+        var results = response.Results ?? [];
+        var failed = results.FirstOrDefault(r => r.HttpStatusCode >= 400 && FirstErrorCode(r.Body) != "PROCESSING_HALTED")
+            ?? results.FirstOrDefault(r => r.HttpStatusCode >= 400);
+        if (failed is not null || results.Count != steps.Count)
+        {
+            var code = failed is null ? "MISSING_RESULTS" : FirstErrorCode(failed.Body);
+            logger.LogWarning(
+                "Salesforce composite request rolled back: step {ReferenceId} failed with {StatusCode} {ErrorCode}",
+                failed?.ReferenceId, failed?.HttpStatusCode, code);
+            throw new CrmUpstreamException($"Salesforce rejected the change ({failed?.HttpStatusCode} {code}); nothing was saved.");
+        }
+
+        return results;
+    }
+
+    private static string? FirstErrorCode(JsonElement body) =>
+        body.ValueKind == JsonValueKind.Array && body.GetArrayLength() > 0 &&
+        body[0].TryGetProperty("errorCode", out var code)
+            ? code.GetString()
+            : null;
 
     /// <summary>Updates the given fields of a record. A null value clears the field.</summary>
     public Task UpdateAsync(string sobject, string id, IReadOnlyDictionary<string, object?> fields, CancellationToken ct) =>
@@ -171,6 +214,9 @@ public sealed class SalesforceRestClient(
         [JsonIgnore]
         public IReadOnlyList<T> Records => RecordsOrNull ?? [];
     }
+
+    private sealed record CompositeResponse(
+        [property: JsonPropertyName("compositeResponse")] IReadOnlyList<CompositeResult>? Results);
 
     private sealed record CreateResult(
         [property: JsonPropertyName("id")] string? Id,

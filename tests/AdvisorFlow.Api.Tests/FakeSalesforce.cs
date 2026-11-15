@@ -37,7 +37,11 @@ public sealed class FakeSalesforce : HttpMessageHandler, IHttpClientFactory
     /// <summary>Record creates and updates (<c>/sobjects/...</c>).</summary>
     public IEnumerable<FakeRequest> Writes => Requests.Where(r => r.Uri.AbsolutePath.Contains("/sobjects/", StringComparison.Ordinal));
 
+    /// <summary>Composite requests (<c>/composite</c>), the all-or-nothing writes.</summary>
+    public IEnumerable<FakeRequest> Composites => Requests.Where(r => r.Uri.AbsolutePath.EndsWith("/composite", StringComparison.Ordinal));
+
     public const string NewAccountId = "001fj00002NewAcAAA";
+    public const string NewContactId = "003fj00002NewCoAAA";
 
     /// <summary>Answers token requests; by default issues token-1, token-2, ...</summary>
     public Func<FakeRequest, HttpResponseMessage> OnToken { get; set; }
@@ -46,9 +50,24 @@ public sealed class FakeSalesforce : HttpMessageHandler, IHttpClientFactory
     public Func<FakeRequest, HttpResponseMessage> OnQuery { get; set; } = _ => Json(QueryResult());
 
     /// <summary>Answers creates (201 with <see cref="NewAccountId"/>) and updates (204) by default.</summary>
-    public Func<FakeRequest, HttpResponseMessage> OnWrite { get; set; } = r => r.Method == HttpMethod.Post
-        ? Json($$"""{"id":"{{NewAccountId}}","success":true,"errors":[]}""", HttpStatusCode.Created)
+    public Func<FakeRequest, HttpResponseMessage> OnWrite { get; set; } = r =>
+        r.Uri.AbsolutePath.EndsWith("/composite", StringComparison.Ordinal) ? Json(CompositeSuccess(r.Body))
+        : r.Method == HttpMethod.Post ? Json($$"""{"id":"{{NewAccountId}}","success":true,"errors":[]}""", HttpStatusCode.Created)
         : new HttpResponseMessage(HttpStatusCode.NoContent);
+
+    /// <summary>A successful composite response: 201 with <see cref="NewContactId"/> for each POST step, 204 for each PATCH.</summary>
+    public static string CompositeSuccess(string requestBody)
+    {
+        using var request = System.Text.Json.JsonDocument.Parse(requestBody);
+        var results = request.RootElement.GetProperty("compositeRequest").EnumerateArray().Select(step =>
+        {
+            var reference = step.GetProperty("referenceId").GetString();
+            return step.GetProperty("method").GetString() == "POST"
+                ? $$"""{"body":{"id":"{{NewContactId}}","success":true,"errors":[]},"httpHeaders":{},"httpStatusCode":201,"referenceId":"{{reference}}"}"""
+                : $$"""{"body":null,"httpHeaders":{},"httpStatusCode":204,"referenceId":"{{reference}}"}""";
+        });
+        return $$"""{"compositeResponse":[{{string.Join(",", results)}}]}""";
+    }
 
     public FakeSalesforce() =>
         OnToken = _ => Json($$"""{"access_token":"token-{{++_tokens}}","instance_url":"{{InstanceUrl}}","token_type":"Bearer"}""");

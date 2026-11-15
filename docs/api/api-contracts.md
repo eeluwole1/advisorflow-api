@@ -1,4 +1,4 @@
-# API guide (contract v1.1.0)
+# API guide (contract v1.2.0)
 
 The authoritative contract is [`openapi.v1.yaml`](openapi.v1.yaml), which `advisorflow-web` builds against. This page is a quick human-readable summary. If the two ever differ, the YAML wins, and `ContractTests` should catch the difference.
 
@@ -12,6 +12,8 @@ Base URL (local): `http://localhost:5080`. All responses are JSON. Errors use [R
 | GET | `/api/households/{id}/contacts` | `200` `HouseholdMember[]` (primary first) | `400`, `404`, `502`, `503` |
 | POST | `/api/households` (1.1) | `201` `HouseholdDetail` + `Location` header | `400`, `502`, `503` |
 | PUT | `/api/households/{id}` (1.1) | `200` `HouseholdDetail` | `400`, `404`, `502`, `503` |
+| POST | `/api/households/{id}/contacts` (1.2) | `201` `HouseholdMember` + `Location` header | `400`, `404`, `502`, `503` |
+| PUT | `/api/households/{id}/contacts/{contactId}` (1.2) | `200` `HouseholdMember` | `400`, `404`, `502`, `503` |
 
 There is no `DELETE`. A household is deactivated by setting `clientStatus` to `Inactive` (ADR-008).
 
@@ -38,14 +40,32 @@ There is no `DELETE`. A household is deactivated by setting `clientStatus` to `I
 - **PUT replaces every editable field:** an omitted or empty optional field is cleared. Send the whole form.
 - `id` and `accountNumber` cannot be changed.
 
-`{id}` must be a 15- or 18-character alphanumeric Salesforce record id; anything else returns `400`. This also keeps malformed input out of future SOQL queries.
+## Body for `POST` and `PUT /api/households/{id}/contacts`
+
+```jsonc
+{ "firstName": "Kofi",                    // ≤ 40 characters, or null
+  "lastName": "Mensah",                   // required, 1–80 characters
+  "email": "kofi.mensah@example.com",     // valid address, ≤ 80 characters, or null
+  "phone": "204-555-0170",                // ≤ 40 characters, or null
+  "preferredContactMethod": "Email",      // Email | Phone | SMS, or null. Email needs email; Phone/SMS need phone
+  "isPrimary": false }                    // optional; omitted means false
+```
+
+**Primary member (BR-HH-003)**
+
+- The household's first member becomes primary automatically.
+- `isPrimary: true` makes that member the primary and clears the previous one. In Salesforce both changes are one all-or-nothing composite request, so a household never has two primaries.
+- The current primary cannot be un-set: `400` with an `isPrimary` error. Make another member primary instead.
+- Members cannot be moved to another household or removed (ADR-008).
+
+`{id}` and `{contactId}` must be 15- or 18-character alphanumeric Salesforce record ids; anything else returns `400`. This also keeps malformed input out of future SOQL queries.
 
 ## Status codes
 
 | Code | Meaning |
 |---|---|
 | 400 | Invalid query parameter, id or request body. `errors` lists each field. |
-| 404 | Household does not exist (or is not a household). |
+| 404 | Household does not exist (or is not a household), or the member is not in that household. |
 | 502 | The CRM returned an error or unusable data. |
 | 503 | The CRM is unreachable or the provider is not configured. |
 | 405 | Method not supported, for example `DELETE` (ADR-008). |
@@ -72,4 +92,4 @@ There is no `DELETE`. A household is deactivated by setting `clientStatus` to `I
 { "items": [ /* T */ ], "page": 1, "pageSize": 20, "totalCount": 7, "totalPages": 1 }
 ```
 
-`riskProfile` is a CRM classification tag. It is **not** an investment suitability assessment. `isPrimary` comes from the Contact field `Is_Primary_Member__c` in Salesforce (BR-HH-003). Member create/update and the one-primary rule follow in the next part of M3.
+`riskProfile` is a CRM classification tag. It is **not** an investment suitability assessment. `isPrimary` comes from the Contact field `Is_Primary_Member__c` in Salesforce (BR-HH-003).

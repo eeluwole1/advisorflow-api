@@ -378,4 +378,117 @@ public class SalesforceProviderTests
 
         await Assert.ThrowsAsync<CrmUpstreamException>(() => sf.Provider.CreateHouseholdAsync(Draft, CancellationToken.None));
     }
+
+    private const string WilliamsId = "001fj00002Eg1LbAAJ";
+    private const string JamesId = "003fj00001v8tUDAAY";
+    private const string SarahId = "003fj00001SarahAAA";
+
+    private static string ContactJson(string id, string first, bool primary) =>
+        $$"""{"Id":"{{id}}","AccountId":"{{WilliamsId}}","FirstName":"{{first}}","LastName":"Williams","Email":null,"Phone":null,"Preferred_Contact_Method__c":null,"Is_Primary_Member__c":{{(primary ? "true" : "false")}}}""";
+
+    /// <summary>Answers "current primaries" with James, and member read-backs with the requested contact.</summary>
+    private static HttpResponseMessage AnswerMemberQueries(FakeRequest r)
+    {
+        var soql = r.Soql!;
+        if (soql.StartsWith("SELECT Id FROM Contact", StringComparison.Ordinal))
+        {
+            return FakeSalesforce.Json(FakeSalesforce.QueryResult($$"""{"Id":"{{JamesId}}"}"""));
+        }
+
+        var id = soql.Contains(FakeSalesforce.NewContactId, StringComparison.Ordinal) ? FakeSalesforce.NewContactId
+            : soql.Contains(SarahId, StringComparison.Ordinal) ? SarahId
+            : JamesId;
+        return FakeSalesforce.Json(FakeSalesforce.QueryResult(ContactJson(id, id == JamesId ? "James" : "Ava", primary: id != JamesId)));
+    }
+
+    private static JsonElement[] Steps(JsonDocument composite) =>
+        composite.RootElement.GetProperty("compositeRequest").EnumerateArray().ToArray();
+
+    [Fact]
+    public async Task Adds_a_non_primary_member_in_one_composite_step()
+    {
+        using var sf = new SalesforceHarness();
+        sf.Http.OnQuery = AnswerMemberQueries;
+        var draft = new MemberDraft("Ava", "Williams", "ava@example.com", null, "Email", IsPrimary: false);
+
+        var member = await sf.Provider.CreateMemberAsync(WilliamsId, draft, CancellationToken.None);
+
+        Assert.Equal(FakeSalesforce.NewContactId, member.Id);
+        Assert.DoesNotContain(sf.Http.Queries, q => q.Soql!.Contains("Is_Primary_Member__c = true", StringComparison.Ordinal));
+        using var composite = JsonDocument.Parse(Assert.Single(sf.Http.Composites).Body);
+        Assert.True(composite.RootElement.GetProperty("allOrNone").GetBoolean());
+        var step = Assert.Single(Steps(composite));
+        Assert.Equal("POST", step.GetProperty("method").GetString());
+        Assert.Equal("/services/data/v68.0/sobjects/Contact", step.GetProperty("url").GetString());
+        var body = step.GetProperty("body");
+        Assert.Equal(WilliamsId, body.GetProperty("AccountId").GetString());
+        Assert.Equal("ava@example.com", body.GetProperty("Email").GetString());
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("Phone").ValueKind);
+        Assert.False(body.GetProperty("Is_Primary_Member__c").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Adding_a_primary_member_clears_the_old_primary_in_the_same_transaction() // BR-HH-003
+    {
+        using var sf = new SalesforceHarness();
+        sf.Http.OnQuery = AnswerMemberQueries;
+
+        await sf.Provider.CreateMemberAsync(WilliamsId, new MemberDraft("Ava", "Williams", null, null, null, IsPrimary: true), CancellationToken.None);
+
+        using var composite = JsonDocument.Parse(Assert.Single(sf.Http.Composites).Body);
+        var steps = Steps(composite);
+        Assert.Equal(2, steps.Length);
+        Assert.Equal("PATCH", steps[0].GetProperty("method").GetString());
+        Assert.Equal($"/services/data/v68.0/sobjects/Contact/{JamesId}", steps[0].GetProperty("url").GetString());
+        Assert.False(steps[0].GetProperty("body").GetProperty("Is_Primary_Member__c").GetBoolean());
+        Assert.Equal("POST", steps[1].GetProperty("method").GetString());
+        Assert.True(steps[1].GetProperty("body").GetProperty("Is_Primary_Member__c").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Making_a_member_primary_patches_it_and_clears_only_the_others() // BR-HH-003
+    {
+        using var sf = new SalesforceHarness();
+        sf.Http.OnQuery = AnswerMemberQueries;
+
+        var updated = await sf.Provider.UpdateMemberAsync(
+            WilliamsId, SarahId, new MemberDraft("Sarah", "Williams", null, null, null, IsPrimary: true), CancellationToken.None);
+
+        Assert.NotNull(updated);
+        using var composite = JsonDocument.Parse(Assert.Single(sf.Http.Composites).Body);
+        var steps = Steps(composite);
+        Assert.Equal(2, steps.Length);
+        Assert.Equal($"/services/data/v68.0/sobjects/Contact/{JamesId}", steps[0].GetProperty("url").GetString());
+        Assert.Equal($"/services/data/v68.0/sobjects/Contact/{SarahId}", steps[1].GetProperty("url").GetString());
+        Assert.False(steps[1].GetProperty("body").TryGetProperty("AccountId", out _)); // members are not moved
+        Assert.Contains(sf.Http.Queries, q => q.Soql!.Contains($"AccountId = '{WilliamsId}'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Updating_a_contact_outside_the_household_changes_nothing()
+    {
+        using var sf = new SalesforceHarness();
+        sf.Http.OnQuery = _ => FakeSalesforce.Json(FakeSalesforce.QueryResult());
+
+        var updated = await sf.Provider.UpdateMemberAsync(
+            WilliamsId, SarahId, new MemberDraft(null, "Williams", null, null, null, IsPrimary: false), CancellationToken.None);
+
+        Assert.Null(updated);
+        Assert.Empty(sf.Http.Composites);
+    }
+
+    [Fact]
+    public async Task A_failed_composite_step_means_nothing_was_saved_and_is_a_502()
+    {
+        using var sf = new SalesforceHarness();
+        sf.Http.OnQuery = AnswerMemberQueries;
+        sf.Http.OnWrite = _ => FakeSalesforce.Json("""
+            {"compositeResponse":[
+              {"body":[{"errorCode":"PROCESSING_HALTED","message":"The transaction was rolled back"}],"httpHeaders":{},"httpStatusCode":400,"referenceId":"clearPrimary0"},
+              {"body":[{"errorCode":"INVALID_EMAIL_ADDRESS","message":"Email: invalid"}],"httpHeaders":{},"httpStatusCode":400,"referenceId":"member"}]}
+            """);
+
+        await Assert.ThrowsAsync<CrmUpstreamException>(() => sf.Provider.CreateMemberAsync(
+            WilliamsId, new MemberDraft("Ava", "Williams", null, null, null, IsPrimary: true), CancellationToken.None));
+    }
 }

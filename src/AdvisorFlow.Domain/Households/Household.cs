@@ -72,3 +72,27 @@ public sealed record HouseholdDraft(
     string? RiskProfile,
     string? Priority,
     string? Phone);
+
+/// <summary>Approved Preferred Contact Method values (verified against the Salesforce picklist, M2).</summary>
+public static class ContactMethods
+{
+    public const string Email = "Email";
+    public const string Phone = "Phone";
+    public const string Sms = "SMS";
+
+    public static readonly IReadOnlySet<string> All =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase) { Email, Phone, Sms };
+}
+
+/// <summary>
+/// The member fields an advisor sets when adding or editing a household member.
+/// Values are already validated. <see cref="IsPrimary"/> is the final decision: when true,
+/// the provider also clears any other primary member of the household in the same change (BR-HH-003).
+/// </summary>
+public sealed record MemberDraft(
+    string? FirstName,
+    string LastName,
+    string? Email,
+    string? Phone,
+    string? PreferredContactMethod,
+    bool IsPrimary);

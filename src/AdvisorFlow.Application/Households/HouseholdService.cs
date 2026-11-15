@@ -18,6 +18,11 @@ public sealed partial class HouseholdService(ICrmDataProvider provider)
     public const int MaxNameLength = 255;
     public const int MaxPhoneLength = 40;
 
+    /// <summary>Salesforce Contact field lengths.</summary>
+    public const int MaxFirstNameLength = 40;
+    public const int MaxLastNameLength = 80;
+    public const int MaxEmailLength = 80;
+
     /// <summary>Returns field errors; an empty dictionary means the query is valid.</summary>
     public static Dictionary<string, string[]> ValidateQuery(int page, int pageSize, string? search, string? status)
     {
@@ -108,6 +113,75 @@ public sealed partial class HouseholdService(ICrmDataProvider provider)
     }
 
     /// <summary>
+    /// Validates a member create/update request and returns the cleaned values. The returned
+    /// draft's <c>IsPrimary</c> is only the request's wish; the service applies the primary
+    /// rules (BR-HH-003) when it knows the household's current members.
+    /// </summary>
+    public static Dictionary<string, string[]> ValidateMember(MemberWriteRequest? request, out MemberDraft? draft)
+    {
+        draft = null;
+        var errors = new Dictionary<string, string[]>();
+        if (request is null)
+        {
+            errors["body"] = ["A JSON body with the member fields is required."];
+            return errors;
+        }
+
+        var lastName = Optional(request.LastName);
+        if (lastName is null)
+        {
+            errors["lastName"] = ["Last name is required."];
+        }
+        else if (lastName.Length > MaxLastNameLength)
+        {
+            errors["lastName"] = [$"Last name must be {MaxLastNameLength} characters or fewer."];
+        }
+
+        var firstName = Optional(request.FirstName);
+        if (firstName is { Length: > MaxFirstNameLength })
+        {
+            errors["firstName"] = [$"First name must be {MaxFirstNameLength} characters or fewer."];
+        }
+
+        var email = Optional(request.Email);
+        if (email is { Length: > MaxEmailLength })
+        {
+            errors["email"] = [$"Email must be {MaxEmailLength} characters or fewer."];
+        }
+        else if (email is not null && !EmailPattern().IsMatch(email))
+        {
+            errors["email"] = ["Email is not a valid address."];
+        }
+
+        var phone = Optional(request.Phone);
+        if (phone is { Length: > MaxPhoneLength })
+        {
+            errors["phone"] = [$"Phone must be {MaxPhoneLength} characters or fewer."];
+        }
+
+        var method = Canonical(ContactMethods.All, request.PreferredContactMethod, "preferredContactMethod", errors);
+        if (!errors.ContainsKey("preferredContactMethod"))
+        {
+            // A preferred method needs the detail it uses (an advisor can't call a number that isn't there).
+            if (method == ContactMethods.Email && email is null)
+            {
+                errors["preferredContactMethod"] = ["Email is preferred, so an email address is required."];
+            }
+            else if (method is ContactMethods.Phone or ContactMethods.Sms && phone is null)
+            {
+                errors["preferredContactMethod"] = [$"{method} is preferred, so a phone number is required."];
+            }
+        }
+
+        if (errors.Count == 0)
+        {
+            draft = new MemberDraft(firstName, lastName!, email, phone, method, request.IsPrimary == true);
+        }
+
+        return errors;
+    }
+
+    /// <summary>
     /// Salesforce record ids are 15 or 18 alphanumeric characters. Rejecting anything else
     /// up front keeps malformed input out of SOQL queries once the Salesforce provider exists.
     /// </summary>
@@ -149,9 +223,7 @@ public sealed partial class HouseholdService(ICrmDataProvider provider)
     public async Task<IReadOnlyList<HouseholdMemberDto>?> GetMembersAsync(string householdId, CancellationToken ct)
     {
         var members = await provider.GetMembersAsync(householdId, ct);
-        return members?.Select(m => new HouseholdMemberDto(
-            m.Id, m.HouseholdId, m.FirstName, m.LastName, m.FullName,
-            m.Email, m.Phone, m.PreferredContactMethod, m.IsPrimary)).ToList();
+        return members?.Select(ToMemberDto).ToList();
     }
 
     /// <summary>Creates a household from a validated draft.</summary>
@@ -173,6 +245,56 @@ public sealed partial class HouseholdService(ICrmDataProvider provider)
         var members = await provider.GetMembersAsync(household.Id, ct) ?? [];
         return ToDetail(household, members.Count);
     }
+
+    /// <summary>
+    /// Adds a member. The first member of a household becomes primary automatically;
+    /// a later member is primary only when the request asks for it (BR-HH-003).
+    /// </summary>
+    public async Task<MemberWriteResult> CreateMemberAsync(string householdId, MemberDraft draft, CancellationToken ct)
+    {
+        var members = await provider.GetMembersAsync(householdId, ct);
+        if (members is null)
+        {
+            return new MemberWriteResult(MemberWriteStatus.HouseholdNotFound);
+        }
+
+        var isPrimary = draft.IsPrimary || !members.Any(m => m.IsPrimary);
+        var created = await provider.CreateMemberAsync(householdId, draft with { IsPrimary = isPrimary }, ct);
+        return new MemberWriteResult(MemberWriteStatus.Ok, ToMemberDto(created));
+    }
+
+    /// <summary>
+    /// Replaces a member's fields. Making a member primary clears the previous primary;
+    /// un-setting the current primary is refused, so a household with members always has one (BR-HH-003).
+    /// </summary>
+    public async Task<MemberWriteResult> UpdateMemberAsync(
+        string householdId, string memberId, MemberDraft draft, CancellationToken ct)
+    {
+        var members = await provider.GetMembersAsync(householdId, ct);
+        if (members is null)
+        {
+            return new MemberWriteResult(MemberWriteStatus.HouseholdNotFound);
+        }
+
+        var current = members.FirstOrDefault(m => string.Equals(m.Id, memberId, StringComparison.Ordinal));
+        if (current is null)
+        {
+            return new MemberWriteResult(MemberWriteStatus.MemberNotFound);
+        }
+
+        if (current.IsPrimary && !draft.IsPrimary)
+        {
+            return new MemberWriteResult(MemberWriteStatus.CannotUnsetPrimary);
+        }
+
+        var updated = await provider.UpdateMemberAsync(householdId, memberId, draft, ct);
+        return updated is null
+            ? new MemberWriteResult(MemberWriteStatus.MemberNotFound)
+            : new MemberWriteResult(MemberWriteStatus.Ok, ToMemberDto(updated));
+    }
+
+    private static HouseholdMemberDto ToMemberDto(HouseholdMember m) => new(
+        m.Id, m.HouseholdId, m.FirstName, m.LastName, m.FullName, m.Email, m.Phone, m.PreferredContactMethod, m.IsPrimary);
 
     private static HouseholdDetailDto ToDetail(Household h, int memberCount) => new(
         h.Id, h.Name, h.ClientStatus, h.RiskProfile, h.Priority, h.Phone, h.AccountNumber, memberCount);
@@ -202,4 +324,8 @@ public sealed partial class HouseholdService(ICrmDataProvider provider)
 
     [GeneratedRegex("^[a-zA-Z0-9]{15}([a-zA-Z0-9]{3})?$")]
     private static partial Regex RecordIdPattern();
+
+    // Deliberately simple: one @, no spaces, a dot in the domain. Salesforce applies its own check too.
+    [GeneratedRegex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$")]
+    private static partial Regex EmailPattern();
 }

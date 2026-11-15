@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: AdvisorFlow API
-  version: 1.1.0
+  version: 1.2.0
   summary: Household CRM API consumed by advisorflow-web.
   description: |
     Versioned contract between advisorflow-api and advisorflow-web (blueprint v1.3 §11.5A).
@@ -19,6 +19,8 @@ info:
     Changes:
     - 1.1.0 (M3): `POST /api/households` and `PUT /api/households/{id}`. There is no
       delete; a household is deactivated by setting `clientStatus` to `Inactive` (ADR-008).
+    - 1.2.0 (M3): `POST /api/households/{id}/contacts` and
+      `PUT /api/households/{id}/contacts/{contactId}`, with the primary-member rule (BR-HH-003).
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -157,6 +159,63 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
+    post:
+      tags: [Households]
+      operationId: createHouseholdMember
+      summary: Add a member to a household
+      description: |
+        Added in 1.2.0. The household's first member becomes primary automatically; a later
+        member is primary only when `isPrimary` is true, which also clears the previous
+        primary in the same all-or-nothing change (BR-HH-003).
+      parameters:
+        - $ref: '#/components/parameters/HouseholdId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MemberWrite' }
+      responses:
+        '201':
+          description: The member was added.
+          headers:
+            Location:
+              description: URL of the household's member list.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdMember' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/households/{id}/contacts/{contactId}:
+    put:
+      tags: [Households]
+      operationId: updateHouseholdMember
+      summary: Replace a member's editable fields
+      description: |
+        Added in 1.2.0. Every editable field is replaced: an omitted or empty optional field is
+        cleared. `isPrimary: true` makes this member the primary and clears the previous one.
+        The current primary cannot be un-set (400 with an `isPrimary` error); make another
+        member primary instead (BR-HH-003). Members cannot be moved or removed.
+      parameters:
+        - $ref: '#/components/parameters/HouseholdId'
+        - $ref: '#/components/parameters/ContactId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MemberWrite' }
+      responses:
+        '200':
+          description: The updated member.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HouseholdMember' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 components:
   parameters:
     HouseholdId:
@@ -164,6 +223,12 @@ components:
       in: path
       required: true
       description: 15- or 18-character Salesforce Account id.
+      schema: { type: string, pattern: '^[a-zA-Z0-9]{15}([a-zA-Z0-9]{3})?$' }
+    ContactId:
+      name: contactId
+      in: path
+      required: true
+      description: 15- or 18-character Salesforce Contact id of a member of this household.
       schema: { type: string, pattern: '^[a-zA-Z0-9]{15}([a-zA-Z0-9]{3})?$' }
   schemas:
     ClientStatus:
@@ -200,6 +265,26 @@ components:
         - $ref: '#/components/schemas/HouseholdCreate'
         - type: object
           required: [clientStatus]
+    ContactMethod:
+      type: string
+      description: Matching is case-insensitive on input. Not the same as marketing consent (BR-SEC-002).
+      enum: [Email, Phone, SMS]
+    MemberWrite:
+      type: object
+      description: |
+        Email needs `email`; Phone and SMS need `phone`. On PUT an omitted or empty optional
+        field is cleared, and an omitted `isPrimary` means false.
+      required: [lastName]
+      properties:
+        firstName: { type: [string, 'null'], maxLength: 40 }
+        lastName: { type: string, minLength: 1, maxLength: 80 }
+        email: { type: [string, 'null'], format: email, maxLength: 80 }
+        phone: { type: [string, 'null'], maxLength: 40 }
+        preferredContactMethod:
+          oneOf:
+            - $ref: '#/components/schemas/ContactMethod'
+            - type: 'null'
+        isPrimary: { type: [boolean, 'null'] }
     HouseholdSummary:
       type: object
       required: [id, name, clientStatus, riskProfile, priority, memberCount, primaryContactName]
@@ -269,7 +354,7 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/ProblemDetails' }
     NotFound:
-      description: The household does not exist.
+      description: The household, or the member within it, does not exist.
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/ProblemDetails' }

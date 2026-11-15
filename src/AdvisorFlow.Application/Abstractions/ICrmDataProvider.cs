@@ -28,6 +28,18 @@ public interface ICrmDataProvider
 
     /// <summary>Replaces the editable fields of a household. Returns null when it does not exist.</summary>
     Task<Household?> UpdateHouseholdAsync(string id, HouseholdDraft draft, CancellationToken ct);
+
+    /// <summary>
+    /// Adds a member to an existing household and returns it as stored. When the draft is
+    /// primary, any other primary member is cleared in the same all-or-nothing change.
+    /// </summary>
+    Task<HouseholdMember> CreateMemberAsync(string householdId, MemberDraft draft, CancellationToken ct);
+
+    /// <summary>
+    /// Replaces a member's editable fields. Returns null when the member does not belong to the
+    /// household. When the draft is primary, other primary members are cleared in the same change.
+    /// </summary>
+    Task<HouseholdMember?> UpdateMemberAsync(string householdId, string memberId, MemberDraft draft, CancellationToken ct);
 }
 
 /// <summary>The CRM cannot be reached or is not configured. The API maps this to HTTP 503.</summary>

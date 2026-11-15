@@ -45,6 +45,7 @@ public sealed class MockCrmDataProvider : ICrmDataProvider
     private readonly List<Household> _households = [.. SeedHouseholds];
     private readonly List<HouseholdMember> _members = [.. SeedMembers];
     private int _nextHousehold = SeedHouseholds.Count + 1;
+    private int _nextMember = SeedMembers.Count + 1;
 
     private List<Household> Households
     {
@@ -147,6 +148,71 @@ public sealed class MockCrmDataProvider : ICrmDataProvider
             };
             _households[index] = updated;
             return Task.FromResult<Household?>(updated);
+        }
+    }
+
+    public Task<HouseholdMember> CreateMemberAsync(string householdId, MemberDraft draft, CancellationToken ct)
+    {
+        lock (_lock)
+        {
+            if (_households.All(h => h.Id != householdId))
+            {
+                throw new InvalidOperationException($"Household {householdId} does not exist.");
+            }
+
+            if (draft.IsPrimary)
+            {
+                ClearPrimary(householdId, exceptMemberId: null);
+            }
+
+            // 003MOCK + 11 digits = 18 characters, like a Salesforce Contact id.
+            var member = new HouseholdMember(
+                $"003MOCK{_nextMember++:D11}", householdId, draft.FirstName ?? string.Empty, draft.LastName,
+                draft.Email, draft.Phone, draft.PreferredContactMethod, draft.IsPrimary);
+            _members.Add(member);
+            return Task.FromResult(member);
+        }
+    }
+
+    public Task<HouseholdMember?> UpdateMemberAsync(string householdId, string memberId, MemberDraft draft, CancellationToken ct)
+    {
+        lock (_lock)
+        {
+            var index = _members.FindIndex(m => m.Id == memberId && m.HouseholdId == householdId);
+            if (index < 0)
+            {
+                return Task.FromResult<HouseholdMember?>(null);
+            }
+
+            if (draft.IsPrimary)
+            {
+                ClearPrimary(householdId, exceptMemberId: memberId);
+            }
+
+            var updated = _members[index] with
+            {
+                FirstName = draft.FirstName ?? string.Empty,
+                LastName = draft.LastName,
+                Email = draft.Email,
+                Phone = draft.Phone,
+                PreferredContactMethod = draft.PreferredContactMethod,
+                IsPrimary = draft.IsPrimary,
+            };
+            _members[index] = updated;
+            return Task.FromResult<HouseholdMember?>(updated);
+        }
+    }
+
+    /// <summary>Un-sets the household's other primary members. Caller holds the lock.</summary>
+    private void ClearPrimary(string householdId, string? exceptMemberId)
+    {
+        for (var i = 0; i < _members.Count; i++)
+        {
+            var m = _members[i];
+            if (m.HouseholdId == householdId && m.IsPrimary && m.Id != exceptMemberId)
+            {
+                _members[i] = m with { IsPrimary = false };
+            }
         }
     }
 }

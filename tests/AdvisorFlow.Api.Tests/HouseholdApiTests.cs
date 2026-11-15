@@ -116,5 +116,7 @@ public class HouseholdApiTests(MockApiFactory factory) : IClassFixture<MockApiFa
             IReadOnlyCollection<string> householdIds, CancellationToken ct) => throw Fail();
         public Task<Household> CreateHouseholdAsync(HouseholdDraft draft, CancellationToken ct) => throw Fail();
         public Task<Household?> UpdateHouseholdAsync(string id, HouseholdDraft draft, CancellationToken ct) => throw Fail();
+        public Task<HouseholdMember> CreateMemberAsync(string householdId, MemberDraft draft, CancellationToken ct) => throw Fail();
+        public Task<HouseholdMember?> UpdateMemberAsync(string householdId, string memberId, MemberDraft draft, CancellationToken ct) => throw Fail();
     }
 }

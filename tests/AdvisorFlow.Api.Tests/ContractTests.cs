@@ -58,6 +58,22 @@ public class ContractTests(MockApiFactory factory) : IClassFixture<MockApiFactor
         AssertMatchesSchema(updatedBody.RootElement, "HouseholdDetail");
     }
 
+    [Fact]
+    public async Task Member_create_and_update_responses_match_contract() // v1.2
+    {
+        var created = await _client.PostAsJsonAsync("/api/households/001MOCK00000000007/contacts", new { lastName = "Martin" });
+        Assert.Equal(System.Net.HttpStatusCode.Created, created.StatusCode);
+        using var createdBody = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        AssertMatchesSchema(createdBody.RootElement, "HouseholdMember");
+
+        var id = createdBody.RootElement.GetProperty("id").GetString();
+        var updated = await _client.PutAsJsonAsync(
+            $"/api/households/001MOCK00000000007/contacts/{id}", new { firstName = "Luc", lastName = "Martin", isPrimary = true });
+        updated.EnsureSuccessStatusCode();
+        using var updatedBody = JsonDocument.Parse(await updated.Content.ReadAsStringAsync());
+        AssertMatchesSchema(updatedBody.RootElement, "HouseholdMember");
+    }
+
     private async Task<JsonDocument> GetJson(string url)
     {
         var response = await _client.GetAsync(url);
