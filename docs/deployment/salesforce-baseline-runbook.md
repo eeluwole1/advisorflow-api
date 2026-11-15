@@ -172,5 +172,45 @@ dotnet user-secrets list --project src\AdvisorFlow.Api | ForEach-Object { $_ -re
 
 ### Follow-ups
 
-- Daniel Carter shares James Williams's phone number (204-555-0101), left over from the original test contact. Give him his own fictional number with the admin login (`advisorflow-dev`), not the read-only integration user.
+- ~~Daniel Carter shares James Williams's phone number.~~ Fixed on 14 Nov 2026: 204-555-0102 (see section 8d).
 - Developer Edition API limits apply; the API should cache the access token rather than signing in per request.
+
+## 8. Prepare Salesforce for writes (M3)
+
+Done on 14 Nov 2026, following ADR-008 (no hard delete, separate write permission set, acting advisor deferred to M7).
+
+### 8a. Primary member field
+
+Contact → **Is Primary Member** (`Is_Primary_Member__c`), Checkbox, default unchecked. Field-level security: System Administrator only (other profiles explicitly have no access); added to the four Contact layouts. The API enforces at most one primary per household (BR-HH-003).
+
+`AdvisorFlow API Read` now also reads `Is_Primary_Member__c`.
+
+### 8b. Permission set `AdvisorFlow API Write` (`AdvisorFlow_API_Write`)
+
+License: Salesforce API Integration. Assigned to the integration user (no expiry).
+
+| Object | Object permissions | Field edit access |
+|---|---|---|
+| Account | Read, Create, Edit (no Delete, no View/Modify All) | Phone, Client Status, Client Risk Profile, Customer Priority (Name is automatic) |
+| Contact | Read, Create, Edit (no Delete) | Account Name (`AccountId`), Email, Phone, Preferred Contact Method, Is Primary Member (First/Last Name are automatic) |
+
+Record type: **Household** assigned, so the API can create household Accounts. Account Number stays read-only.
+
+### 8c. Retrieve into the repo
+
+Both permission sets were added to `manifest/baseline-package.xml`, then:
+
+```powershell
+./scripts/retrieve-baseline.ps1
+```
+
+Real changes: the new field, both permission sets, +4 lines in each Contact layout, and the new field's access in each of the 7 profiles (Admin: read/edit; others: none). The CLI labels every retrieved file "Changed"; `git diff --stat` shows what actually differs.
+
+### 8d. Verify with the CLI (integration user)
+
+| Check | Command | Result |
+|---|---|---|
+| Edit | `sf data update record --target-org advisorflow-integration --sobject Contact --record-id 003fj00001v2tLdAAI --values "Phone=204-555-0102"` | Success (also gives Daniel Carter his own number) |
+| Create | `sf data create record --target-org advisorflow-integration --sobject Contact --values "FirstName=Delete LastName=Test AccountId=001fj00002Et3AfAAJ"` | Success: `003fj00001vIicLAAS` |
+| Delete | `sf data delete record --target-org advisorflow-integration --sobject Contact --record-id 003fj00001vIicLAAS` | **Rejected:** `INSUFFICIENT_ACCESS_OR_READONLY` (expected) |
+| Clean-up | same delete with `--target-org advisorflow-dev` (admin) | Test contact removed (Recycle Bin) |
