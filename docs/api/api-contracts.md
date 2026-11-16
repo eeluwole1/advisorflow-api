@@ -1,4 +1,4 @@
-# API guide (contract v1.2.0)
+# API guide (contract v1.2.1)
 
 The authoritative contract is [`openapi.v1.yaml`](openapi.v1.yaml), which `advisorflow-web` builds against. This page is a quick human-readable summary. If the two ever differ, the YAML wins, and `ContractTests` should catch the difference.
 
@@ -65,6 +65,7 @@ There is no `DELETE`. A household is deactivated by setting `clientStatus` to `I
 | Code | Meaning |
 |---|---|
 | 400 | Invalid query parameter, id or request body. `errors` lists each field. |
+| 403 | Create/update on a read-only deployment (`Features:AllowWrites` is false, e.g. on Azure until sign-in exists; ADR-009). |
 | 404 | Household does not exist (or is not a household), or the member is not in that household. |
 | 502 | The CRM returned an error or unusable data. |
 | 503 | The CRM is unreachable or the provider is not configured. |

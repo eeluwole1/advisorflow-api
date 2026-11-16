@@ -1,3 +1,4 @@
+using AdvisorFlow.Api.Features;
 using AdvisorFlow.Application.Households;
 using Microsoft.AspNetCore.Mvc;
 
@@ -63,6 +64,8 @@ public sealed class HouseholdsController(HouseholdService households) : Controll
 
     /// <summary>Creates a household. Client Status defaults to Prospect.</summary>
     [HttpPost]
+    [ServiceFilter<WritesEnabledFilter>]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<HouseholdDetailDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] HouseholdWriteRequest? request, CancellationToken ct)
@@ -82,6 +85,8 @@ public sealed class HouseholdsController(HouseholdService households) : Controll
     /// There is no delete: set Client Status to Inactive to deactivate (ADR-008).
     /// </summary>
     [HttpPut("{id}")]
+    [ServiceFilter<WritesEnabledFilter>]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<HouseholdDetailDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
@@ -104,6 +109,8 @@ public sealed class HouseholdsController(HouseholdService households) : Controll
 
     /// <summary>Adds a member. The household's first member becomes primary automatically (BR-HH-003).</summary>
     [HttpPost("{id}/contacts")]
+    [ServiceFilter<WritesEnabledFilter>]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<HouseholdMemberDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
@@ -131,6 +138,8 @@ public sealed class HouseholdsController(HouseholdService households) : Controll
     /// clears the previous one; the current primary cannot be un-set directly (BR-HH-003).
     /// </summary>
     [HttpPut("{id}/contacts/{contactId}")]
+    [ServiceFilter<WritesEnabledFilter>]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<HouseholdMemberDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

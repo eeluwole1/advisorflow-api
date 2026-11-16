@@ -39,7 +39,7 @@ Try it:
 - Raw contract: http://localhost:5080/openapi/v1.yaml
 - Plain JSON: http://localhost:5080/api/households
 
-`Cors:AllowedOrigins` in `appsettings.Development.json` allows `http://localhost:4200` (the Angular dev server). `Crm:Provider` chooses `Mock` (default) or `Salesforce`. Salesforce secrets never go in appsettings. Locally they go in `dotnet user-secrets`, and in Azure they go in Key Vault.
+`Cors:AllowedOrigins` in `appsettings.Development.json` allows `http://localhost:4200` (the Angular dev server). `Crm:Provider` chooses `Mock` (default) or `Salesforce`. `Features:AllowWrites` is `true` only in Development; deployed environments are read-only until advisor sign-in exists (ADR-009). Salesforce secrets never go in appsettings. Locally they go in `dotnet user-secrets`, and in Azure they go in Key Vault.
 
 ### Run against Salesforce
 

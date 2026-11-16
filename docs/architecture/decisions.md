@@ -68,3 +68,13 @@ The API reads Salesforce as one dedicated **integration user**, signing in with 
 - **No hard delete.** Households are deactivated by setting Client Status to Inactive, which keeps history and the audit trail. The API exposes no `DELETE` for households. Removing a member from a household is decided with the member endpoints.
 - **Separate write permission set.** Writes use a new permission set, `AdvisorFlow API Write` (Create and Edit on Account and Contact, only the fields the API writes; no Delete, no Modify All). `AdvisorFlow API Read` stays read-only, so write access can be revoked on its own.
 - **Acting advisor deferred to M7.** M3 has no app sign-in, so every change reaches Salesforce as the integration user and Salesforce's *Last Modified By* shows that user. Recording the acting advisor (Microsoft Entra sign-in and audit fields) is added with deployment in M7. Until then the prototype is single-user and uses fictional data only.
+
+## ADR-009: Read-only public deployment until advisor sign-in exists
+**Status:** Approved, 15 Nov 2026 (first Azure deployment)
+
+The API can create and edit Salesforce records (ADR-008), but advisor sign-in is deferred to M7. A public deployment without sign-in would let anyone who finds the URL change the org.
+
+- **Decision:** the deployed API is **read-only**. `Features:AllowWrites` is `false` in `appsettings.json` and `true` only in `appsettings.Development.json`, so the safe value is the default and a missing setting can never enable writes.
+- **How:** a resource filter on every create/update endpoint answers `403` with a problem response before model binding, whatever the body. Reads are unaffected. Documented in the contract (1.2.1) and covered by `ReadOnlyModeApiTests`.
+- **Defence in depth:** Salesforce still enforces the integration user's permission sets (no delete, ADR-008), and the private key lives in Azure Key Vault, read by the App Service's managed identity (`Salesforce:PrivateKeyPem` as a Key Vault reference).
+- **Next:** writes are switched on in a deployed environment only once advisor sign-in (Microsoft Entra) protects them, together with recording the acting advisor (M7).

@@ -136,21 +136,34 @@ public sealed class SalesforceAuthenticator(
             return _key;
         }
 
-        var path = _options.PrivateKeyReference!;
-        if (!File.Exists(path))
+        string pem;
+        string source;
+        if (!string.IsNullOrWhiteSpace(_options.PrivateKeyPem))
         {
-            throw new CrmUnavailableException($"The Salesforce private key file was not found at '{path}'.");
+            pem = _options.PrivateKeyPem;
+            source = "The Salesforce:PrivateKeyPem setting";
+        }
+        else
+        {
+            var path = _options.PrivateKeyReference!;
+            if (!File.Exists(path))
+            {
+                throw new CrmUnavailableException($"The Salesforce private key file was not found at '{path}'.");
+            }
+
+            pem = File.ReadAllText(path);
+            source = "The Salesforce private key file";
         }
 
         var rsa = RSA.Create();
         try
         {
-            rsa.ImportFromPem(File.ReadAllText(path));
+            rsa.ImportFromPem(pem);
         }
         catch (Exception ex) when (ex is ArgumentException or CryptographicException)
         {
             rsa.Dispose();
-            throw new CrmUnavailableException("The Salesforce private key file is not a valid PEM RSA key.", ex);
+            throw new CrmUnavailableException($"{source} is not a valid PEM RSA key.", ex);
         }
 
         return _key = rsa;

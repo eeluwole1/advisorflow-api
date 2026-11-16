@@ -1,5 +1,6 @@
 using AdvisorFlow.Api.ApiDocs;
 using AdvisorFlow.Api.ErrorHandling;
+using AdvisorFlow.Api.Features;
 using AdvisorFlow.Application.Households;
 using AdvisorFlow.Infrastructure;
 
@@ -8,6 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 // --- Application + infrastructure ---------------------------------------------
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<HouseholdService>();
+builder.Services.Configure<ApiFeatures>(builder.Configuration.GetSection(ApiFeatures.SectionName));
+builder.Services.AddScoped<WritesEnabledFilter>();
 
 // --- Web API plumbing ---------------------------------------------------------
 builder.Services.AddControllers();
@@ -45,8 +48,9 @@ app.UseCors(FrontendCors);
 app.MapHealthChecks("/health");
 app.MapControllers();
 
-app.Logger.LogInformation("AdvisorFlow API started with CRM provider: {Provider}",
-    app.Configuration["Crm:Provider"] ?? "Mock");
+app.Logger.LogInformation("AdvisorFlow API started with CRM provider: {Provider}; writes allowed: {AllowWrites}",
+    app.Configuration["Crm:Provider"] ?? "Mock",
+    app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<ApiFeatures>>().Value.AllowWrites);
 
 app.Run();
 

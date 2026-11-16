@@ -19,9 +19,13 @@ public sealed class SalesforceOptions
     /// <summary>Username of the dedicated, read-only integration user.</summary>
     public string? IntegrationUsername { get; set; }
 
-    /// <summary>Path to the PEM private key that signs the JWT. Local development only;
-    /// deployed environments load the key from Azure Key Vault (M7).</summary>
+    /// <summary>Path to the PEM private key that signs the JWT. Local development.</summary>
     public string? PrivateKeyReference { get; set; }
+
+    /// <summary>The PEM private key itself. Used on Azure, where the App Service setting is a
+    /// Key Vault reference, so the key never touches disk or source control. Wins over
+    /// <see cref="PrivateKeyReference"/> when both are set.</summary>
+    public string? PrivateKeyPem { get; set; }
 
     /// <summary>The JWT <c>aud</c> claim. Production and Developer Edition orgs use
     /// https://login.salesforce.com; sandboxes use https://test.salesforce.com.</summary>
@@ -38,5 +42,5 @@ public sealed class SalesforceOptions
         !string.IsNullOrWhiteSpace(LoginUrl) &&
         !string.IsNullOrWhiteSpace(ClientId) &&
         !string.IsNullOrWhiteSpace(IntegrationUsername) &&
-        !string.IsNullOrWhiteSpace(PrivateKeyReference);
+        (!string.IsNullOrWhiteSpace(PrivateKeyPem) || !string.IsNullOrWhiteSpace(PrivateKeyReference));
 }

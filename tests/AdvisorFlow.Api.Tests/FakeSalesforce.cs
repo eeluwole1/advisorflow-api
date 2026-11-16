@@ -134,6 +134,9 @@ public sealed class SalesforceHarness : IDisposable
 
     public static RSA PublicKey => SharedKey.Value;
 
+    /// <summary>The throwaway private key as PEM text, as Azure would supply it from Key Vault.</summary>
+    public static string PrivateKeyPem => SharedKey.Value.ExportPkcs8PrivateKeyPem();
+
     public string KeyPath { get; }
 
     public SalesforceOptions Options { get; }

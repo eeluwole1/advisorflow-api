@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: AdvisorFlow API
-  version: 1.2.0
+  version: 1.2.1
   summary: Household CRM API consumed by advisorflow-web.
   description: |
     Versioned contract between advisorflow-api and advisorflow-web (blueprint v1.3 §11.5A).
@@ -21,6 +21,7 @@ info:
       delete; a household is deactivated by setting `clientStatus` to `Inactive` (ADR-008).
     - 1.2.0 (M3): `POST /api/households/{id}/contacts` and
       `PUT /api/households/{id}/contacts/{contactId}`, with the primary-member rule (BR-HH-003).
+    - 1.2.1: documents `403` on create/update when a deployment is read-only (ADR-009).
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -97,6 +98,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/HouseholdDetail' }
         '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/ReadOnly' }
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
   /api/households/{id}:
@@ -121,6 +123,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/HouseholdDetail' }
         '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/ReadOnly' }
         '404': { $ref: '#/components/responses/NotFound' }
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -185,6 +188,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/HouseholdMember' }
         '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/ReadOnly' }
         '404': { $ref: '#/components/responses/NotFound' }
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -213,6 +217,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/HouseholdMember' }
         '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/ReadOnly' }
         '404': { $ref: '#/components/responses/NotFound' }
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -350,6 +355,13 @@ components:
   responses:
     ValidationError:
       description: Invalid query parameter, id or request body.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    ReadOnly:
+      description: |
+        This deployment is read-only (`Features:AllowWrites` is false), so no change was made.
+        Returned before the body is read (ADR-009).
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/ProblemDetails' }

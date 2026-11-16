@@ -203,6 +203,33 @@ public class SalesforceProviderTests
     }
 
     [Fact]
+    public async Task Signs_in_with_the_key_from_configuration_instead_of_a_file() // Azure: Key Vault reference
+    {
+        using var sf = new SalesforceHarness(o =>
+        {
+            o.PrivateKeyReference = null;
+            o.PrivateKeyPem = SalesforceHarness.PrivateKeyPem;
+        });
+
+        await sf.Provider.GetHouseholdsAsync(FirstPage, CancellationToken.None);
+
+        Assert.Single(sf.Http.TokenRequests);
+    }
+
+    [Fact]
+    public async Task An_invalid_key_in_configuration_is_a_503()
+    {
+        using var sf = new SalesforceHarness(o =>
+        {
+            o.PrivateKeyReference = null;
+            o.PrivateKeyPem = "-----BEGIN PRIVATE KEY-----\nnot a key\n-----END PRIVATE KEY-----";
+        });
+
+        await Assert.ThrowsAsync<CrmUnavailableException>(() => sf.Provider.GetHouseholdsAsync(FirstPage, CancellationToken.None));
+        Assert.Empty(sf.Http.Requests);
+    }
+
+    [Fact]
     public async Task A_Salesforce_server_error_is_a_503()
     {
         using var sf = new SalesforceHarness();
