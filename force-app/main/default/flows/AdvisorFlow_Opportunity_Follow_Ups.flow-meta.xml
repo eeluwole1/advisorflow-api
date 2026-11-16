@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>68.0</apiVersion>
+    <assignments>
+        <name>Set_Proposal_Review</name>
+        <label>Set Proposal Review</label>
+        <locationX>314</locationX>
+        <locationY>431</locationY>
+        <assignmentItems>
+            <assignToReference>varAutomation</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Proposal review</stringValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>varSubject</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>fmlProposalSubject</elementReference>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>Get_Open_Automation_Task</targetReference>
+        </connector>
+    </assignments>
+    <assignments>
+        <name>Set_Qualification_Follow_Up</name>
+        <label>Set Qualification Follow-up</label>
+        <locationX>50</locationX>
+        <locationY>431</locationY>
+        <assignmentItems>
+            <assignToReference>varAutomation</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <stringValue>Qualification follow-up</stringValue>
+            </value>
+        </assignmentItems>
+        <assignmentItems>
+            <assignToReference>varSubject</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>fmlQualificationSubject</elementReference>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>Get_Open_Automation_Task</targetReference>
+        </connector>
+    </assignments>
+    <decisions>
+        <description>No open task of this kind for the opportunity yet (BR-ACT-002).</description>
+        <name>No_Open_Task_Yet</name>
+        <label>No Open Task Yet?</label>
+        <locationX>182</locationX>
+        <locationY>731</locationY>
+        <defaultConnectorLabel>Already has one</defaultConnectorLabel>
+        <rules>
+            <name>None_Open</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Get_Open_Automation_Task</leftValueReference>
+                <operator>IsNull</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Create_Follow_Up_Task</targetReference>
+            </connector>
+            <label>None open</label>
+        </rules>
+    </decisions>
+    <decisions>
+        <description>Only Advisory Engagement opportunities; picks the automation for the stage just entered.</description>
+        <name>Route_By_Stage</name>
+        <label>Route by Stage</label>
+        <locationX>182</locationX>
+        <locationY>323</locationY>
+        <defaultConnectorLabel>Not an advisory follow-up</defaultConnectorLabel>
+        <rules>
+            <name>Entered_Qualification</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>$Record.RecordType.DeveloperName</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <stringValue>Advisory_Engagement</stringValue>
+                </rightValue>
+            </conditions>
+            <conditions>
+                <leftValueReference>$Record.StageName</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <stringValue>Qualification</stringValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Set_Qualification_Follow_Up</targetReference>
+            </connector>
+            <label>Entered Qualification</label>
+        </rules>
+        <rules>
+            <name>Entered_Proposal_Presented</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>$Record.RecordType.DeveloperName</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <stringValue>Advisory_Engagement</stringValue>
+                </rightValue>
+            </conditions>
+            <conditions>
+                <leftValueReference>$Record.StageName</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <stringValue>Proposal Presented</stringValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Set_Proposal_Review</targetReference>
+            </connector>
+            <label>Entered Proposal Presented</label>
+        </rules>
+    </decisions>
+    <description>AdvisorFlow M5 (BR-ACT-001, BR-ACT-002, ADR-011). When an Advisory Engagement opportunity is created in, or its stage changes into, Qualification or Proposal Presented, create one follow-up task for the opportunity owner, due in 3 days, unless an open task from the same automation already exists for that opportunity. Edits that do not change the stage never create a task.</description>
+    <formulas>
+        <name>fmlDueDate</name>
+        <dataType>Date</dataType>
+        <expression>TODAY() + 3</expression>
+    </formulas>
+    <formulas>
+        <name>fmlProposalSubject</name>
+        <dataType>String</dataType>
+        <expression>&quot;Proposal review: &quot; &amp; {!$Record.Name}</expression>
+    </formulas>
+    <formulas>
+        <name>fmlQualificationSubject</name>
+        <dataType>String</dataType>
+        <expression>&quot;Qualification follow-up: &quot; &amp; {!$Record.Name}</expression>
+    </formulas>
+    <interviewLabel>AdvisorFlow Opportunity Follow-ups {!$Flow.CurrentDateTime}</interviewLabel>
+    <label>AdvisorFlow Opportunity Follow-ups</label>
+    <processMetadataValues>
+        <name>BuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>CanvasMode</name>
+        <value>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
+        </value>
+    </processMetadataValues>
+    <processMetadataValues>
+        <name>OriginBuilderType</name>
+        <value>
+            <stringValue>LightningFlowBuilder</stringValue>
+        </value>
+    </processMetadataValues>
+    <processType>AutoLaunchedFlow</processType>
+    <recordCreates>
+        <name>Create_Follow_Up_Task</name>
+        <label>Create Follow-up Task</label>
+        <locationX>50</locationX>
+        <locationY>839</locationY>
+        <inputAssignments>
+            <field>ActivityDate</field>
+            <value>
+                <elementReference>fmlDueDate</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Automation__c</field>
+            <value>
+                <elementReference>varAutomation</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>OwnerId</field>
+            <value>
+                <elementReference>$Record.OwnerId</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Priority</field>
+            <value>
+                <stringValue>Normal</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Status</field>
+            <value>
+                <stringValue>Not Started</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Subject</field>
+            <value>
+                <elementReference>varSubject</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>WhatId</field>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </inputAssignments>
+        <object>Task</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordCreates>
+    <recordLookups>
+        <name>Get_Open_Automation_Task</name>
+        <label>Get Open Automation Task</label>
+        <locationX>182</locationX>
+        <locationY>623</locationY>
+        <assignNullValuesIfNoRecordsFound>true</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>No_Open_Task_Yet</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>WhatId</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </filters>
+        <filters>
+            <field>Automation__c</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>varAutomation</elementReference>
+            </value>
+        </filters>
+        <filters>
+            <field>IsClosed</field>
+            <operator>EqualTo</operator>
+            <value>
+                <booleanValue>false</booleanValue>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>Task</object>
+        <queriedFields>Id</queriedFields>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+    <start>
+        <locationX>56</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Route_By_Stage</targetReference>
+        </connector>
+        <filterFormula>AND(OR(ISNEW(), ISCHANGED({!$Record.StageName})), OR(ISPICKVAL({!$Record.StageName}, &apos;Qualification&apos;), ISPICKVAL({!$Record.StageName}, &apos;Proposal Presented&apos;)))</filterFormula>
+        <object>Opportunity</object>
+        <recordTriggerType>CreateAndUpdate</recordTriggerType>
+        <triggerType>RecordAfterSave</triggerType>
+    </start>
+    <status>Active</status>
+    <variables>
+        <name>varAutomation</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>varSubject</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+</Flow>

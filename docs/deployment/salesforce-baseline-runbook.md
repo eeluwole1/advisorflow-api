@@ -266,3 +266,39 @@ Click **Save** on the permission set page before retrieving: an unsaved edit ret
 ### 9f. Retrieve into the repo
 
 No manifest change was needed: the `Opportunity` CustomObject brings its fields, record type, business process and validation rule. `./scripts/retrieve-baseline.ps1` added 326 lines and removed none (committed as `1ee06c4`).
+
+## 10. Follow-up automation (M5)
+
+Built as source (ADR-011), deployed with the Salesforce CLI rather than clicked together in Setup.
+
+### 10a. Components
+
+| Component | Path |
+|---|---|
+| Task field `Automation__c` (picklist: Qualification follow-up, Proposal review) | `force-app/main/default/objects/Activity/fields/Automation__c.field-meta.xml` |
+| Record-triggered flow `AdvisorFlow_Opportunity_Follow_Ups` (active) | `force-app/main/default/flows/AdvisorFlow_Opportunity_Follow_Ups.flow-meta.xml` |
+
+Both are listed in `manifest/baseline-package.xml`, so the retrieve script keeps them in step with the org.
+
+### 10b. Deploy
+
+Check first (`--dry-run` validates and rolls back), then deploy:
+
+```powershell
+sf project deploy start --target-org advisorflow-dev --dry-run `
+  --source-dir force-app/main/default/objects/Activity/fields/Automation__c.field-meta.xml `
+  --source-dir force-app/main/default/flows/AdvisorFlow_Opportunity_Follow_Ups.flow-meta.xml
+# same command without --dry-run
+```
+
+### 10c. Field access
+
+A deployed field is visible to nobody, including System Administrator. Object Manager → **Activity** → Fields & Relationships → **Automation** → **Set Field-Level Security**: **System Administrator** Visible + Read-Only, then **Save**. Without it, the verification script fails to compile with *No such column 'Automation__c' on entity 'Task'*. The flow itself runs in system context and does not need it.
+
+### 10d. Verify
+
+```powershell
+sf apex run --target-org advisorflow-dev --file scripts/verify-follow-up-flow.apex | Select-String "USER_DEBUG"
+```
+
+Nine scenarios (create, edit, enter Qualification, task details, repeat edit, step back and forward with the task open and after completing it, Proposal Presented, Closed Won, create directly in Qualification), ending with `RESULT ALL PASSED (test records rolled back)`. Result on 16 Nov 2026: all passed.

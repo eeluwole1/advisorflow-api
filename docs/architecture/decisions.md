@@ -92,3 +92,15 @@ The blueprint (§9) proposes the stages but leaves the stage-transition rule (BR
 - **Amount (BR-OP-003).** The standard Amount field holds estimated advisory service revenue, never assets under management. The contract, API guide and UI labels say so.
 - **Access.** `AdvisorFlow API Read` reads Opportunity (View All) and the fields used; `AdvisorFlow API Write` adds Create and Edit (no Delete, ADR-008), edit access to the fields the API writes, and the Advisory Engagement record type. Probability stays read-only: Salesforce sets it from the stage.
 - **Automation (BR-ACT-001/002)** on stage changes, such as the Qualification follow-up task, is a Salesforce Flow in M5, not API code.
+
+## ADR-011: Follow-up tasks are created by a Salesforce Flow (M5)
+**Status:** Approved, 16 Nov 2026
+
+BR-ACT-001/002 ask for one follow-up task when an opportunity enters Qualification, without duplicates on repeated edits. The blueprint assigns this to Salesforce Flow and says not to build the same task in both .NET and Flow.
+
+- **Owner: Salesforce.** The record-triggered flow `AdvisorFlow_Opportunity_Follow_Ups` (after save, create and update) runs however the stage changes: through the API, the Salesforce UI or a data load. The API never creates these tasks.
+- **When it fires.** Only when an Advisory Engagement opportunity is created in, or its stage *changes into*, **Qualification** (task "Qualification follow-up: …") or **Proposal Presented** (task "Proposal review: …", from the blueprint's automation plan). Edits that don't change the stage never fire it, and Closed Won/Lost never create tasks.
+- **Duplicate rule (BR-ACT-002).** Because the stage rule allows one step back (ADR-010), an opportunity can enter a stage more than once. A new task is created on each entry **unless an open task from the same automation already exists** for that opportunity. Alternatives considered: once ever (misses a genuine second round of follow-up) and every entry (stacks open tasks after a correction).
+- **Marker field.** The Task picklist `Automation__c` (*Qualification follow-up*, *Proposal review*) identifies the automation's tasks; tasks people log leave it blank. It is read-only for System Administrator so a manual edit can't defeat the duplicate check; it was deployed with no access for other profiles.
+- **Task values.** Owner = opportunity owner, related to the opportunity (`WhatId`), status Not Started, priority Normal, due 3 days after the stage change.
+- **Evidence.** `scripts/verify-follow-up-flow.apex` runs nine scenarios against the org and rolls everything back. All passed on 16 Nov 2026.
