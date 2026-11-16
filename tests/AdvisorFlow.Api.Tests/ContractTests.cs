@@ -106,6 +106,20 @@ public class ContractTests(MockApiFactory factory) : IClassFixture<MockApiFactor
         AssertMatchesSchema(updatedBody.RootElement, "Opportunity");
     }
 
+    [Fact]
+    public async Task Activity_reads_match_contract() // v1.4
+    {
+        using var page = await GetJson("/api/activities?state=all");
+        AssertMatchesSchema(page.RootElement, "ActivityPage");
+        AssertMatchesSchema(page.RootElement.GetProperty("items")[0], "Activity");
+
+        using var household = await GetJson("/api/households/001MOCK00000000002/activities");
+        AssertMatchesSchema(household.RootElement[0], "Activity");
+
+        using var opportunity = await GetJson("/api/opportunities/006MOCK00000000001/activities");
+        AssertMatchesSchema(opportunity.RootElement[0], "Activity");
+    }
+
     private async Task<JsonDocument> GetJson(string url)
     {
         var response = await _client.GetAsync(url);

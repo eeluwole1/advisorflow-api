@@ -8,12 +8,12 @@ The backend for **AdvisorFlow CRM**, a financial advisory CRM prototype. It's an
 advisorflow-web (Angular) ──HTTPS/JSON, contract v1──► AdvisorFlow.Api
                                                         │ controllers · error mapping
                                                    AdvisorFlow.Application
-                                                        │ HouseholdService · OpportunityService · validation · DTOs
+                                                        │ HouseholdService · OpportunityService · ActivityService · validation · DTOs
                                                         │ ICrmDataProvider
                                                    AdvisorFlow.Infrastructure
                                                    ├─ MockCrmDataProvider        (local development)
                                                    └─ SalesforceCrmDataProvider  (M2, server-side OAuth) ──► Salesforce DE
-                                                   AdvisorFlow.Domain  (Household, HouseholdMember, Opportunity, rules)
+                                                   AdvisorFlow.Domain  (Household, HouseholdMember, Opportunity, ActivityTask, rules)
 ```
 
 ## Current status: milestone M5, activities (in progress)
@@ -21,11 +21,11 @@ advisorflow-web (Angular) ──HTTPS/JSON, contract v1──► AdvisorFlow.Api
 Where the project stands, what's next and how we work: [`docs/project-status.md`](docs/project-status.md).
 
 - **Follow-up automation (M5, done):** the Salesforce Flow `AdvisorFlow_Opportunity_Follow_Ups` creates a follow-up task when an opportunity enters Qualification and a review task on Proposal Presented, without duplicates (BR-ACT-001/002, ADR-011). Verified with `scripts/verify-follow-up-flow.apex`.
-- **Activities API (M5, next):** read tasks per household, per opportunity, and open/overdue.
+- **Activities API (M5, contract 1.4):** `GET /api/activities` (open, overdue, closed or all; overdue in America/Winnipeg time), a household's tasks and an opportunity's tasks. Read-only, so it also works on the Azure deployment (ADR-012).
 
 - **Households (M1–M3):** list (search, status filter, paging), detail, members; create and update households and members, with the primary-member rule. No delete (ADR-008).
 - **Opportunities (M4, contract 1.3):** the pipeline (`GET /api/opportunities`, filter by stage or household), detail, a household's opportunities, create and update with the stage rule: forward any number, back one, closed is final (BR-OP-004, ADR-010).
-- Mock provider with seven fictional households and seven opportunities (default, and always used by the tests).
+- Mock provider with seven fictional households, seven opportunities and eight tasks (default, and always used by the tests).
 - Salesforce provider: signs in as the integration user with the OAuth 2.0 JWT bearer flow and works only with `Household` Accounts and `Advisory_Engagement` Opportunities.
 - Deployed on Azure, read-only until advisor sign-in exists (ADR-009).
 - Errors use problem details: 400 / 403 / 404 / 502 / 503
@@ -66,7 +66,8 @@ The `salesforce` profile only sets `Crm__Provider=Salesforce`; the connection se
 | `HouseholdApiTests` | Every endpoint over HTTP; 400/404/502/503; no upstream detail leaks |
 | `OpportunityStageRuleTests`, `OpportunityServiceTests` | Stage rule (BR-OP-004), validation (BR-OP-001 to 003), create/update workflow |
 | `OpportunityApiTests` | Opportunity endpoints over HTTP, including the stage and loss-reason errors |
-| `SalesforceProviderTests`, `SalesforceOpportunityTests` | SOQL, mapping, writes and error handling against a fake Salesforce |
+| `ActivityServiceTests`, `ActivityApiTests` | Overdue rule in Winnipeg time (BR-ACT-003), task order, state filters, task endpoints over HTTP |
+| `SalesforceProviderTests`, `SalesforceOpportunityTests`, `SalesforceActivityTests` | SOQL, mapping, writes and error handling against a fake Salesforce |
 | `ReadOnlyModeApiTests` | Every create/update is 403 when writes are off (ADR-009) |
 | `ContractTests` | Response JSON fields equal the required fields in `openapi.v1.yaml` |
 | `ArchitectureTests` | Layer rules: Domain ← Application ← Infrastructure ← Api |

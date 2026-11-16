@@ -20,9 +20,21 @@ A financial advisory CRM prototype: advisors see **households**, their **members
 | M2 Salesforce baseline | Done | Metadata retrieved into the repo; JWT bearer integration user (ADR-007) |
 | M3 Households and members | Done (API writes + web read views) | Household record type, primary-member rule, no delete (ADR-008) |
 | M4 Opportunities | **Done** | Own sales process + Advisory Engagement record type, stage rule (ADR-010), loss reason, pipeline page and household opportunities on the web |
-| M5 Activities and automation | **In progress** | Flow done and verified (ADR-011); integration user can read tasks. Next: activities API, then web views |
+| M5 Activities and automation | **In progress** | Flow done and verified (ADR-011); activities API done (contract 1.4.0, ADR-012). Next: Apex test class, LWC, web views |
 | M6 Analytics | Not started | Pipeline/activity dashboard; totals must reconcile to seed data |
 | M7 Azure hardening | Partly done early | Deployed read-only (ADR-009) with Key Vault, CI/CD on push; still to do: Entra sign-in, then enable writes, monitoring, smoke/security tests |
+
+## Why this project, and the deadline
+
+AdvisorFlow is the portfolio piece for **IG Wealth Management, Senior Salesforce Developer (req. 14375, Winnipeg/Toronto), apply by 23 Nov 2026**. The posting stresses Salesforce depth (Apex, Lightning, Flows, integrations, security model), CI/CD and automated testing, operability, and responsible AI-assisted delivery. Work is prioritised by what shows those skills, truthfully, before the deadline.
+
+## Priorities until 23 Nov 2026 (decided 16 Nov)
+
+1. **Activities API: done 16 Nov** (contract 1.4.0, ADR-012, BR-ACT-003). Read-only task endpoints; overdue in America/Winnipeg time. Verify the SOQL against the real org once (runbook §10e query plus `Account.RecordType.DeveloperName = 'Household'`).
+2. **Apex test class for the follow-up Flow** (`@isTest`, same scenarios as `scripts/verify-follow-up-flow.apex`), run with `sf apex run test`, plus a Salesforce validation step in CI (dry-run deploy + tests against the org via JWT). Lets the resume truthfully say "Apex test classes".
+3. **Lightning Web Component** on the Opportunity record page listing its follow-up tasks (Apex controller + Jest test). Shows Lightning/LWC.
+4. Web Activities page and task lists on households (the original M5 web scope).
+5. Trailhead: Flow, Apex and LWC badges as verifiable recent learning.
 
 ## Next steps (M5)
 

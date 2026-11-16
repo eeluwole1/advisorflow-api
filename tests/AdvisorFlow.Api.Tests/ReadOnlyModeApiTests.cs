@@ -64,4 +64,13 @@ public class ReadOnlyModeApiTests(MockApiFactory factory) : IClassFixture<MockAp
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
+
+    [Theory]
+    [InlineData("/api/activities")]
+    [InlineData("/api/households/001MOCK00000000002/activities")]
+    [InlineData("/api/opportunities/006MOCK00000000001/activities")]
+    public async Task Activity_reads_work_on_a_read_only_deployment(string url) // M5
+    {
+        Assert.Equal(HttpStatusCode.OK, (await _client.GetAsync(url)).StatusCode);
+    }
 }

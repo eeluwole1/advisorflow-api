@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
 using AdvisorFlow.Application.Abstractions;
+using AdvisorFlow.Application.Activities;
 using AdvisorFlow.Application.Households;
 using AdvisorFlow.Application.Opportunities;
+using AdvisorFlow.Domain.Activities;
 using AdvisorFlow.Domain.Households;
 using AdvisorFlow.Domain.Opportunities;
 using Microsoft.AspNetCore.Hosting;
@@ -125,5 +127,8 @@ public class HouseholdApiTests(MockApiFactory factory) : IClassFixture<MockApiFa
         public Task<IReadOnlyList<Opportunity>?> GetHouseholdOpportunitiesAsync(string householdId, CancellationToken ct) => throw Fail();
         public Task<Opportunity> CreateOpportunityAsync(string householdId, OpportunityDraft draft, CancellationToken ct) => throw Fail();
         public Task<Opportunity?> UpdateOpportunityAsync(string id, OpportunityDraft draft, CancellationToken ct) => throw Fail();
+        public Task<PagedResult<ActivityTask>> GetTasksAsync(ActivityQuery query, CancellationToken ct) => throw Fail();
+        public Task<IReadOnlyList<ActivityTask>?> GetHouseholdTasksAsync(string householdId, CancellationToken ct) => throw Fail();
+        public Task<IReadOnlyList<ActivityTask>?> GetOpportunityTasksAsync(string opportunityId, CancellationToken ct) => throw Fail();
     }
 }

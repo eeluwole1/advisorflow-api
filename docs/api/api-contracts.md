@@ -1,4 +1,4 @@
-# API guide (contract v1.3.0)
+# API guide (contract v1.4.0)
 
 The authoritative contract is [`openapi.v1.yaml`](openapi.v1.yaml), which `advisorflow-web` builds against. This page is a quick human-readable summary. If the two ever differ, the YAML wins, and `ContractTests` should catch the difference.
 
@@ -19,6 +19,9 @@ Base URL (local): `http://localhost:5080`. All responses are JSON. Errors use [R
 | GET | `/api/households/{id}/opportunities` (1.3) | `200` `Opportunity[]` (by close date) | `400`, `404`, `502`, `503` |
 | POST | `/api/households/{id}/opportunities` (1.3) | `201` `Opportunity` + `Location` header | `400`, `404`, `502`, `503` |
 | PUT | `/api/opportunities/{id}` (1.3) | `200` `Opportunity` | `400`, `404`, `502`, `503` |
+| GET | `/api/activities` (1.4) | `200` `PagedResponse<Activity>` (open first, by due date) | `400`, `502`, `503` |
+| GET | `/api/households/{id}/activities` (1.4) | `200` `Activity[]` (incl. its opportunities' tasks) | `400`, `404`, `502`, `503` |
+| GET | `/api/opportunities/{id}/activities` (1.4) | `200` `Activity[]` | `400`, `404`, `502`, `503` |
 
 There is no `DELETE`. A household is deactivated by setting `clientStatus` to `Inactive`; an opportunity ends as Closed Won or Closed Lost (ADR-008).
 
@@ -96,6 +99,16 @@ Prospecting → Qualification → Needs Assessment → Proposal Presented → Ne
 
 `{id}` and `{contactId}` must be 15- or 18-character alphanumeric Salesforce record ids; anything else returns `400`. This also keeps malformed input out of future SOQL queries.
 
+## Query parameters for `GET /api/activities` (1.4)
+
+| Name | Default | Rules |
+|---|---|---|
+| `page`, `pageSize`, `search` | 1, 20, — | As for households; `search` matches the task subject |
+| `state` | `open` | `open`, `overdue`, `closed` or `all`, case-insensitive |
+| `householdId` | — | A 15- or 18-character record id; includes tasks on the household's opportunities |
+
+**Tasks are read-only in the API.** Advisors log them in Salesforce, and the follow-up Flow creates them when an opportunity enters Qualification or Proposal Presented (BR-ACT-001/002, ADR-011); `automation` says which. Every list puts open tasks first, then sorts by due date (tasks without one last), then subject. **Overdue** means open with a due date before today in the practice's time zone, America/Winnipeg (BR-ACT-003, ADR-012); a task due today is not overdue.
+
 ## Status codes
 
 | Code | Meaning |
@@ -130,6 +143,13 @@ Prospecting → Qualification → Needs Assessment → Proposal Presented → Ne
   "name": "Okafor Household - Investment Advisory", "stage": "Proposal Presented", "isClosed": false,
   "closeDate": "2026-12-01", "amount": 12000, "probability": 60, "serviceType": "Investment Advisory",
   "engagementPriority": "Medium", "nextStep": "Follow up on the proposal", "lossReason": null }
+
+// Activity (1.4)
+{ "id": "00TMOCK00000000002", "subject": "Proposal review: Okafor Household - Investment Advisory",
+  "status": "Not Started", "priority": "Normal", "dueDate": "2026-11-19", "isClosed": false, "isOverdue": false,
+  "householdId": "001MOCK00000000002", "householdName": "Okafor Household", "relatedToId": "006MOCK00000000002",
+  "relatedToName": "Okafor Household - Investment Advisory", "relatedToType": "Opportunity",
+  "contactName": null, "ownerName": "Demo Advisor", "automation": "Proposal review" }
 
 // PagedResponse<T>
 { "items": [ /* T */ ], "page": 1, "pageSize": 20, "totalCount": 7, "totalPages": 1 }

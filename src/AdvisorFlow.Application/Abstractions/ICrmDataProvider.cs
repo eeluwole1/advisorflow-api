@@ -1,5 +1,7 @@
+using AdvisorFlow.Application.Activities;
 using AdvisorFlow.Application.Households;
 using AdvisorFlow.Application.Opportunities;
+using AdvisorFlow.Domain.Activities;
 using AdvisorFlow.Domain.Households;
 using AdvisorFlow.Domain.Opportunities;
 
@@ -8,7 +10,7 @@ namespace AdvisorFlow.Application.Abstractions;
 /// <summary>
 /// The boundary between the application and the CRM system of record.
 /// Infrastructure supplies a mock provider (local development) and a Salesforce
-/// provider (M2). Writes were added in M3, opportunities in M4. Implementations return null for "not found" and throw
+/// provider (M2). Writes were added in M3, opportunities in M4, tasks in M5. Implementations return null for "not found" and throw
 /// <see cref="CrmUnavailableException"/> or <see cref="CrmUpstreamException"/>
 /// for integration failures.
 /// </summary>
@@ -60,6 +62,22 @@ public interface ICrmDataProvider
 
     /// <summary>Replaces an opportunity's editable fields. Returns null when it does not exist.</summary>
     Task<Opportunity?> UpdateOpportunityAsync(string id, OpportunityDraft draft, CancellationToken ct);
+
+    /// <summary>
+    /// One page of tasks on household Accounts or their opportunities, filtered by
+    /// <see cref="ActivityQuery.State"/> ("overdue" uses <see cref="ActivityQuery.Today"/>),
+    /// in the order of <see cref="ActivityRules.InListOrder"/>.
+    /// </summary>
+    Task<PagedResult<ActivityTask>> GetTasksAsync(ActivityQuery query, CancellationToken ct);
+
+    /// <summary>
+    /// A household's tasks, including those on its opportunities (up to 200, any order),
+    /// or null when the household does not exist.
+    /// </summary>
+    Task<IReadOnlyList<ActivityTask>?> GetHouseholdTasksAsync(string householdId, CancellationToken ct);
+
+    /// <summary>An advisory opportunity's tasks (up to 200, any order), or null when it does not exist.</summary>
+    Task<IReadOnlyList<ActivityTask>?> GetOpportunityTasksAsync(string opportunityId, CancellationToken ct);
 }
 
 /// <summary>The CRM cannot be reached or is not configured. The API maps this to HTTP 503.</summary>

@@ -14,6 +14,14 @@ namespace AdvisorFlow.Infrastructure.Crm;
 /// </summary>
 public sealed partial class MockCrmDataProvider : ICrmDataProvider
 {
+    /// <summary>Creates the provider; <paramref name="clock"/> sets "today" for the seed tasks' due dates.</summary>
+    public MockCrmDataProvider(TimeProvider? clock = null)
+    {
+        _tasks = [.. SeedTasks(Application.Activities.ActivityService.TodayFor(clock ?? TimeProvider.System))];
+    }
+
+    private readonly List<Domain.Activities.ActivityTask> _tasks;
+
     private static readonly IReadOnlyList<Household> SeedHouseholds =
     [
         new("001MOCK00000000001", "Williams Household", ClientStatuses.Prospect, "Moderate", "Medium", "204-555-0101", "ADV-0001"),

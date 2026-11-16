@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: AdvisorFlow API
-  version: 1.3.0
+  version: 1.4.0
   summary: Household CRM API consumed by advisorflow-web.
   description: |
     Versioned contract between advisorflow-api and advisorflow-web (blueprint v1.3 §11.5A).
@@ -26,6 +26,9 @@ info:
       `GET /api/opportunities/{id}`, `GET` and `POST /api/households/{id}/opportunities`, and
       `PUT /api/opportunities/{id}`, with BR-OP-001 to BR-OP-004 (ADR-010). No delete: an
       opportunity ends as Closed Won or Closed Lost.
+    - 1.4.0 (M5): follow-up tasks, read-only. `GET /api/activities` (open, overdue, closed or all),
+      `GET /api/households/{id}/activities` and `GET /api/opportunities/{id}/activities`.
+      Tasks are created in Salesforce, by people or by the follow-up Flow (ADR-011).
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -39,6 +42,8 @@ tags:
     description: Households (Salesforce Accounts) and their members (Contacts).
   - name: Opportunities
     description: Advisory opportunities (Salesforce Opportunities) for households.
+  - name: Activities
+    description: Follow-up tasks (Salesforce Tasks) on households and their opportunities.
 paths:
   /health:
     get:
@@ -355,6 +360,83 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
+  /api/activities:
+    get:
+      tags: [Activities]
+      operationId: listActivities
+      summary: Follow-up tasks across households
+      description: |
+        Added in 1.4.0. Open tasks come before closed ones, then by due date (undated last),
+        then subject. `overdue` means still open with a due date before today in the
+        practice's time zone, America/Winnipeg (BR-ACT-003, ADR-012).
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: search
+          in: query
+          description: Case-insensitive match on the task subject.
+          schema: { type: string, maxLength: 80 }
+        - name: state
+          in: query
+          description: Which tasks to list. Matching is case-insensitive.
+          schema: { $ref: '#/components/schemas/ActivityState' }
+        - name: householdId
+          in: query
+          description: Only this household's tasks, including those on its opportunities.
+          schema: { type: string, pattern: '^[a-zA-Z0-9]{15}([a-zA-Z0-9]{3})?$' }
+      responses:
+        '200':
+          description: One page of tasks.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActivityPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/households/{id}/activities:
+    get:
+      tags: [Activities]
+      operationId: listHouseholdActivities
+      summary: A household's tasks, including those on its opportunities
+      description: Added in 1.4.0. Same order as the task list; open and closed tasks are both returned.
+      parameters:
+        - $ref: '#/components/parameters/HouseholdId'
+      responses:
+        '200':
+          description: The household's tasks; empty when it has none.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Activity' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/opportunities/{id}/activities:
+    get:
+      tags: [Activities]
+      operationId: listOpportunityActivities
+      summary: An opportunity's tasks
+      description: Added in 1.4.0. Same order as the task list; open and closed tasks are both returned.
+      parameters:
+        - $ref: '#/components/parameters/OpportunityId'
+      responses:
+        '200':
+          description: The opportunity's tasks; empty when it has none.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Activity' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 components:
   parameters:
     HouseholdId:
@@ -556,6 +638,48 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/Opportunity' }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1 }
+        totalCount: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    ActivityState:
+      type: string
+      enum: [open, overdue, closed, all]
+      default: open
+    Activity:
+      type: object
+      required: [id, subject, status, priority, dueDate, isClosed, isOverdue, householdId, householdName, relatedToId, relatedToName, relatedToType, contactName, ownerName, automation]
+      properties:
+        id: { type: string }
+        subject: { type: string }
+        status:
+          type: string
+          description: The Salesforce task status, e.g. Not Started, In Progress, Waiting on someone else, Completed.
+        priority: { type: [string, 'null'], description: 'High, Normal or Low.' }
+        dueDate: { type: [string, 'null'], format: date }
+        isClosed: { type: boolean }
+        isOverdue:
+          type: boolean
+          description: Open with a due date before today in America/Winnipeg (BR-ACT-003).
+        householdId: { type: string }
+        householdName: { type: string }
+        relatedToId: { type: [string, 'null'], description: The household or opportunity the task is attached to. }
+        relatedToName: { type: [string, 'null'] }
+        relatedToType: { type: [string, 'null'], description: '`Household` or `Opportunity`.' }
+        contactName: { type: [string, 'null'], description: 'The household member the task is about, if any.' }
+        ownerName: { type: [string, 'null'] }
+        automation:
+          type: [string, 'null']
+          description: |
+            `Qualification follow-up` or `Proposal review` when the follow-up Flow created the task
+            (ADR-011); null when a person logged it.
+    ActivityPage:
+      type: object
+      required: [items, page, pageSize, totalCount, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Activity' }
         page: { type: integer, minimum: 1 }
         pageSize: { type: integer, minimum: 1 }
         totalCount: { type: integer, minimum: 0 }
