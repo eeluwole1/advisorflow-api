@@ -16,7 +16,12 @@ advisorflow-web (Angular) ──HTTPS/JSON, contract v1──► AdvisorFlow.Api
                                                    AdvisorFlow.Domain  (Household, HouseholdMember, Opportunity, rules)
 ```
 
-## Current status: milestone M4, opportunities
+## Current status: milestone M5, activities (in progress)
+
+Where the project stands, what's next and how we work: [`docs/project-status.md`](docs/project-status.md).
+
+- **Follow-up automation (M5, done):** the Salesforce Flow `AdvisorFlow_Opportunity_Follow_Ups` creates a follow-up task when an opportunity enters Qualification and a review task on Proposal Presented, without duplicates (BR-ACT-001/002, ADR-011). Verified with `scripts/verify-follow-up-flow.apex`.
+- **Activities API (M5, next):** read tasks per household, per opportunity, and open/overdue.
 
 - **Households (M1–M3):** list (search, status filter, paging), detail, members; create and update households and members, with the primary-member rule. No delete (ADR-008).
 - **Opportunities (M4, contract 1.3):** the pipeline (`GET /api/opportunities`, filter by stage or household), detail, a household's opportunities, create and update with the stage rule: forward any number, back one, closed is final (BR-OP-004, ADR-010).

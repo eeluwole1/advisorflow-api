@@ -13,6 +13,7 @@
         <members>Account</members>
         <members>Contact</members>
         <members>Opportunity</members>
+        <members>Task</members>
         <name>CustomObject</name>
     </types>
     <types>
@@ -49,6 +50,7 @@
         <members>Custom%3A Sales Profile</members>
         <members>Custom%3A Support Profile</members>
         <members>MarketingProfile</members>
+        <members>Minimum Access - API Only Integrations</members>
         <members>Read Only</members>
         <members>Standard</members>
         <name>Profile</name>

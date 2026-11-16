@@ -302,3 +302,19 @@ sf apex run --target-org advisorflow-dev --file scripts/verify-follow-up-flow.ap
 ```
 
 Nine scenarios (create, edit, enter Qualification, task details, repeat edit, step back and forward with the task open and after completing it, Proposal Presented, Closed Won, create directly in Qualification), ending with `RESULT ALL PASSED (test records rolled back)`. Result on 16 Nov 2026: all passed.
+
+### 10e. Integration-user access to tasks (for the activities API)
+
+Three settings, all needed before the integration user can read tasks:
+
+1. **Access Activities** (system permission) on `AdvisorFlow_API_Read`: Setup → Permission Sets → AdvisorFlow API Read → System Permissions → Edit → tick → Save, then **Save again in the "Save changes?" dialog**. Without it, SOQL answers *sObject type 'Task' is not supported*. It retrieves as `<userPermissions><name>ActivitiesAccess</name>`.
+2. **Task field-level security on the profile, not the permission set.** Salesforce does not offer Task or Event field access in permission sets, so it goes on the integration user's profile, **Minimum Access - API Only Integrations**. Profiles → that profile → Field-Level Security → **Task [ View ]** (right-hand column, below *Store Catalog*) → Edit → **Read Access only** for Automation, Due Date, Name and Related To → Save. Subject, Status, Priority and Assigned To are always readable.
+3. Verify as the integration user:
+
+```powershell
+sf data query --target-org advisorflow-integration --query "SELECT Id, Subject, Status, Priority, ActivityDate, IsClosed, WhatId, What.Name, AccountId, Owner.Name, Automation__c FROM Task LIMIT 3"
+```
+
+A missing field shows as *No such column 'X' on entity 'Task'*. Result on 16 Nov 2026: succeeds (0 records, since the verification script rolls its tasks back).
+
+To keep this in the repo, the manifest now also lists the **Task** object and the **Minimum Access - API Only Integrations** profile (a profile's Task field access is only retrieved when Task is in the same retrieve). The first retrieve after this change added `objects/Task/` and the integration profile, added `ActivitiesAccess` to the read permission set, and added default Task/Event field entries to the other profiles. The flow file came back with Salesforce's auto-layout positions (0,0), which is harmless.

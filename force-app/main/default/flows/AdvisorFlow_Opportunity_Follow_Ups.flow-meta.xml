@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>68.0</apiVersion>
+    <areMetricsLoggedToDataCloud>false</areMetricsLoggedToDataCloud>
     <assignments>
         <name>Set_Proposal_Review</name>
         <label>Set Proposal Review</label>
-        <locationX>314</locationX>
-        <locationY>431</locationY>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
         <assignmentItems>
             <assignToReference>varAutomation</assignToReference>
             <operator>Assign</operator>
@@ -27,8 +28,8 @@
     <assignments>
         <name>Set_Qualification_Follow_Up</name>
         <label>Set Qualification Follow-up</label>
-        <locationX>50</locationX>
-        <locationY>431</locationY>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
         <assignmentItems>
             <assignToReference>varAutomation</assignToReference>
             <operator>Assign</operator>
@@ -51,8 +52,8 @@
         <description>No open task of this kind for the opportunity yet (BR-ACT-002).</description>
         <name>No_Open_Task_Yet</name>
         <label>No Open Task Yet?</label>
-        <locationX>182</locationX>
-        <locationY>731</locationY>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
         <defaultConnectorLabel>Already has one</defaultConnectorLabel>
         <rules>
             <name>None_Open</name>
@@ -74,8 +75,8 @@
         <description>Only Advisory Engagement opportunities; picks the automation for the stage just entered.</description>
         <name>Route_By_Stage</name>
         <label>Route by Stage</label>
-        <locationX>182</locationX>
-        <locationY>323</locationY>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
         <defaultConnectorLabel>Not an advisory follow-up</defaultConnectorLabel>
         <rules>
             <name>Entered_Qualification</name>
@@ -162,8 +163,8 @@
     <recordCreates>
         <name>Create_Follow_Up_Task</name>
         <label>Create Follow-up Task</label>
-        <locationX>50</locationX>
-        <locationY>839</locationY>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
         <inputAssignments>
             <field>ActivityDate</field>
             <value>
@@ -212,8 +213,8 @@
     <recordLookups>
         <name>Get_Open_Automation_Task</name>
         <label>Get Open Automation Task</label>
-        <locationX>182</locationX>
-        <locationY>623</locationY>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
         <assignNullValuesIfNoRecordsFound>true</assignNullValuesIfNoRecordsFound>
         <connector>
             <targetReference>No_Open_Task_Yet</targetReference>
@@ -246,7 +247,7 @@
         <storeOutputAutomatically>true</storeOutputAutomatically>
     </recordLookups>
     <start>
-        <locationX>56</locationX>
+        <locationX>0</locationX>
         <locationY>0</locationY>
         <connector>
             <targetReference>Route_By_Stage</targetReference>
