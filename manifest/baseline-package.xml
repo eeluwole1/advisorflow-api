@@ -18,7 +18,13 @@
     </types>
     <types>
         <members>OpportunityFollowUpFlowTest</members>
+        <members>OpportunityFollowUpsController</members>
+        <members>OpportunityFollowUpsControllerTest</members>
         <name>ApexClass</name>
+    </types>
+    <types>
+        <members>opportunityFollowUps</members>
+        <name>LightningComponentBundle</name>
     </types>
     <types>
         <members>Activity.Automation__c</members>

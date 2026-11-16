@@ -1,0 +1,8 @@
+.followup {
+    padding-top: 0.5rem;
+}
+
+.followup_closed .slds-text-title_bold {
+    color: var(--slds-g-color-neutral-base-50, #747474);
+    text-decoration: line-through;
+}

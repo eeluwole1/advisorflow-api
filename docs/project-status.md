@@ -32,8 +32,8 @@ AdvisorFlow is the portfolio piece for **IG Wealth Management, Senior Salesforce
 
 1. **Activities API: done 16 Nov** (contract 1.4.0, ADR-012, BR-ACT-003). Read-only task endpoints; overdue in America/Winnipeg time. Verify the SOQL against the real org once (runbook §10e query plus `Account.RecordType.DeveloperName = 'Household'`).
 2. **Apex test class: done 16 Nov.** `OpportunityFollowUpFlowTest`, 10/10 passing including a 200-record bulk test (runbook §10f). Still open: a Salesforce validation step in CI (dry-run deploy + tests via a JWT CI user with deploy rights; needs its own least-privilege user and secret).
-3. **Lightning Web Component** on the Opportunity record page listing its follow-up tasks (Apex controller + Jest test). Shows Lightning/LWC.
-4. Web Activities page and task lists on households (the original M5 web scope).
+3. **Lightning Web Component: built 16 Nov** (`opportunityFollowUps` + `OpportunityFollowUpsController` with Apex tests + 5 Jest tests; runbook §10g). Deploy and place on the Opportunity page; CI runs the Jest tests.
+4. **Web Activities page: done 16 Nov.** Open / overdue / completed / all views with search and paging; Follow-ups section on each household; Flow-created tasks tagged "Auto".
 5. Trailhead: Flow, Apex and LWC badges as verifiable recent learning.
 
 ## Next steps (M5)

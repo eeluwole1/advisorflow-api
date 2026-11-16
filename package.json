@@ -1,0 +1,12 @@
+{
+  "name": "advisorflow-salesforce",
+  "private": true,
+  "description": "Tooling for the Salesforce metadata in force-app (Lightning Web Component tests).",
+  "scripts": {
+    "test:lwc": "sfdx-lwc-jest --skipApiVersionCheck",
+    "test:lwc:coverage": "sfdx-lwc-jest --skipApiVersionCheck --coverage"
+  },
+  "devDependencies": {
+    "@salesforce/sfdx-lwc-jest": "^7.0.0"
+  }
+}

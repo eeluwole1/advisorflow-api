@@ -1,0 +1,58 @@
+<template>
+    <lightning-card title={cardTitle} icon-name="standard:task">
+        <div class="slds-card__body_inner">
+            <template lwc:if={error}>
+                <p class="slds-text-color_error" data-id="error">Follow-ups couldn't be loaded: {error}</p>
+            </template>
+            <template lwc:elseif={isEmpty}>
+                <p class="slds-text-color_weak" data-id="empty">
+                    No follow-ups yet. One is created automatically when this opportunity reaches Qualification or Proposal Presented.
+                </p>
+            </template>
+            <template lwc:elseif={hasFollowUps}>
+                <ul class="slds-has-dividers_bottom-space">
+                    <template for:each={items} for:item="f">
+                        <li key={f.id} class={f.itemClass} data-id="followup">
+                            <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-start">
+                                <div class="slds-col slds-p-right_small">
+                                    <p class="slds-text-title_bold">{f.subject}</p>
+                                    <p class="slds-text-body_small slds-m-top_xx-small">
+                                        <template lwc:if={f.isOverdue}>
+                                            <lightning-badge label="Overdue" class="slds-theme_error slds-m-right_x-small" data-id="overdue"></lightning-badge>
+                                        </template>
+                                        <span class={f.dueClass}>
+                                            <template lwc:if={f.hasDueDate}>
+                                                {f.duePrefix}
+                                                <lightning-formatted-date-time value={f.dueDate} year="numeric" month="short" day="numeric" time-zone="UTC" class="slds-m-left_xx-small"></lightning-formatted-date-time>
+                                            </template>
+                                            <template lwc:else>No due date</template>
+                                        </span>
+                                        <span class="slds-m-horizontal_xx-small">·</span>{f.status}
+                                        <template lwc:if={f.isHighPriority}>
+                                            <span class="slds-m-horizontal_xx-small">·</span><span class="slds-text-color_error">High priority</span>
+                                        </template>
+                                        <template lwc:if={f.automation}>
+                                            <lightning-badge label={f.automation} icon-name="utility:flow" class="slds-m-left_x-small" data-id="automation"></lightning-badge>
+                                        </template>
+                                    </p>
+                                </div>
+                                <template lwc:if={f.canComplete}>
+                                    <lightning-button
+                                        label="Mark complete"
+                                        variant="neutral"
+                                        data-id={f.id}
+                                        disabled={f.completing}
+                                        onclick={handleComplete}
+                                    ></lightning-button>
+                                </template>
+                            </div>
+                        </li>
+                    </template>
+                </ul>
+            </template>
+            <template lwc:else>
+                <lightning-spinner alternative-text="Loading follow-ups" size="small"></lightning-spinner>
+            </template>
+        </div>
+    </lightning-card>
+</template>

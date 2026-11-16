@@ -337,3 +337,18 @@ sf apex run test --target-org advisorflow-dev --class-names OpportunityFollowUpF
 
 Lesson recorded: the first version of the bulk test failed with *Too many SOQL queries: 101* because the test's own helper queried the household on every loop iteration. The helper now takes the household id, queried once before the loop. Result on 16 Nov 2026: 10/10 passing.
 
+
+### 10g. Follow-ups Lightning Web Component
+
+`force-app/main/default/lwc/opportunityFollowUps` is an "AdvisorFlow Follow-ups" card for the Opportunity record page: the opportunity's tasks (open first, overdue flagged per BR-ACT-003, Flow-created ones tagged) with a **Mark complete** button that saves through Lightning Data Service (`updateRecord`) and refreshes with `refreshApex`. Data comes from `OpportunityFollowUpsController.getFollowUps` (`with sharing`, `WITH USER_MODE`, cacheable), tested by `OpportunityFollowUpsControllerTest`. The component has Jest tests (`npm run test:lwc`), which CI runs on every push.
+
+```powershell
+npm install                      # once, for the Jest runner
+npm run test:lwc                 # 5 component tests
+sf project deploy start --target-org advisorflow-dev --dry-run `
+  --source-dir force-app/main/default/classes --source-dir force-app/main/default/lwc `
+  --test-level RunSpecifiedTests --tests OpportunityFollowUpsControllerTest --tests OpportunityFollowUpFlowTest
+# same command without --dry-run, then place the component:
+```
+
+Place it on the page: open an opportunity → gear → **Edit Page** → drag **AdvisorFlow Follow-ups** (Custom) into the right column → **Save** → **Activate** → **Assign as Org Default** → Save. Placing it is a page-layout change made in Setup; retrieving the FlexiPage into the repo is optional.

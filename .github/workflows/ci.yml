@@ -44,7 +44,7 @@ jobs:
       - run: npx --yes @redocly/cli@2 lint docs/api/openapi.v1.yaml
 
   salesforce:
-    name: Salesforce metadata
+    name: Salesforce metadata + LWC tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,8 +52,15 @@ jobs:
         run: |
           python3 -m json.tool sfdx-project.json > /dev/null
           python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('manifest/baseline-package.xml')"
-      # Org-connected validation (sf project deploy validate) is added in M2,
-      # once a CI auth secret for the Developer Edition org exists.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lightning Web Component tests (Jest)
+        run: npm run test:lwc
+      # Apex tests run in the org (sf apex run test, runbook §10f). Org-connected
+      # validation in CI needs its own least-privilege CI user and secret (project-status.md).
 
   deploy:
     name: Deploy to Azure App Service
