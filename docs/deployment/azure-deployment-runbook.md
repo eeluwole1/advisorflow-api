@@ -76,7 +76,34 @@ az webapp config appsettings set --name app-advisorflow-api-ee1 --resource-group
 
 Plain values work directly, for example `--settings "Features__AllowWrites=false"`.
 
-## 5. Redeploy the API
+## 5. Continuous deployment (GitHub Actions)
+
+Since 15 Nov 2026 both repositories deploy on every push to `main`, in a `deploy` job of `.github/workflows/ci.yml` that runs only after every check in the workflow has passed. Pull requests run the checks but never deploy. A newer push waits for a running deploy rather than cancelling it.
+
+| Repo | Deploy job | GitHub secret (repository secret) | Where the value comes from |
+|---|---|---|---|
+| advisorflow-api | `dotnet publish`, `azure/webapps-deploy@v3`, then a `/health` smoke test (retries for 3 minutes) | `AZURE_WEBAPP_PUBLISH_PROFILE` | `az webapp deployment list-publishing-profiles --name app-advisorflow-api-ee1 --resource-group rg-advisorflow --xml` |
+| advisorflow-web | `ng build`, then `Azure/static-web-apps-deploy@v1` uploads `dist/advisorflow-web/browser` | `AZURE_STATIC_WEB_APPS_API_TOKEN` | `az staticwebapp secrets list --name swa-advisorflow-web --resource-group rg-advisorflow --query properties.apiKey -o tsv` |
+
+Copy a value with `... | Set-Clipboard`, paste it into the secret, then clear the clipboard (`Set-Clipboard -Value " "`). Never print or commit these values.
+
+**Publish profiles need basic-auth publishing on the app's deployment endpoint**, which Azure turns off for new apps. It was switched on for the SCM (Kudu) endpoint only:
+
+```powershell
+az resource update --resource-group rg-advisorflow --name scm --namespace Microsoft.Web --resource-type basicPublishingCredentialsPolicies --parent sites/app-advisorflow-api-ee1 --set properties.allow=true --query properties.allow -o tsv
+```
+
+Lessons from the first setup:
+
+- A publish profile downloaded **while basic auth was off** contains an 8-character placeholder password and fails with *Publish profile is invalid for app-name and slot-name*. Download it again after enabling basic auth; the real password is about 60 characters.
+- *No credentials found* means the secret is missing or empty (check **Settings → Secrets and variables → Actions → Repository secrets**).
+- To check a profile before saving it, without printing it: parse it with `[xml]`, take the `MSDeploy` profile, and call `https://<publishUrl>/api/settings` with its user name and password as Basic auth; expect `200`.
+
+To rotate the deploy password: `az webapp deployment publish-credentials reset` (or *Reset publish profile* in the portal), then update the secret. To stop CI deploys, delete the secret or set `properties.allow=false`.
+
+The manual commands below still work and are the fallback.
+
+## 6. Redeploy the API manually
 
 From `C:\advisorflow-api`, after the tests pass:
 
@@ -89,7 +116,7 @@ az webapp deploy --name app-advisorflow-api-ee1 --resource-group rg-advisorflow 
 
 The first request after a deploy or restart can take 30-60 seconds: the F1 tier starts the app on demand.
 
-## 6. Redeploy the web app
+## 7. Redeploy the web app manually
 
 From `C:\advisorflow-web`:
 
@@ -101,7 +128,7 @@ npx @azure/static-web-apps-cli deploy dist/advisorflow-web/browser --deployment-
 
 `public/staticwebapp.config.json` sends unknown paths to `index.html`, so deep links such as `/clients/{id}` survive a reload.
 
-## 7. Smoke test
+## 8. Smoke test
 
 | Check | Expected |
 |---|---|
@@ -111,22 +138,22 @@ npx @azure/static-web-apps-cli deploy dist/advisorflow-web/browser --deployment-
 | `GET /swagger` | `404` (API docs are Development-only, ADR-009) |
 | Web site | Clients list loads; opening a household shows its members |
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Web shows "Households couldn't be loaded" and the browser console mentions `Access-Control-Allow-Origin` | Site not in CORS | Set `Cors__AllowedOrigins__0`, then restart the API |
 | API returns `503` | Key Vault references not resolved, or Salesforce sign-in failed | Check the identity's role on the vault; in the portal, **Environment variables** shows each Key Vault reference's status |
 | `Forbidden` when setting a secret | RBAC role not yet effective | Wait a minute and retry |
-| Web shows the Azure placeholder page | No upload yet | Run section 6 |
+| Web shows the Azure placeholder page | No upload yet | Push to `main`, or run section 7 |
 
 Logs: `az webapp log tail --name app-advisorflow-api-ee1 --resource-group rg-advisorflow`. The startup line reports the CRM provider and whether writes are allowed.
 
-## 9. Cost and clean-up
+## 10. Cost and clean-up
 
 - F1 and Static Web Apps Free cost nothing; Key Vault charges per operation (cents a month). The Azure for Students credit has its own spending cap. Check spend under **Subscriptions > Azure for Students > Overview**.
 - To remove the whole deployment: `az group delete --name rg-advisorflow`. Key Vault keeps deleted vaults for 90 days (soft delete), so a new vault with the same name needs `az keyvault purge --name kv-advisorflow-ee1` first.
 
-## 10. Switching writes on later (M7)
+## 11. Switching writes on later (M7)
 
 Only after Microsoft Entra sign-in protects the API (ADR-009): set `Features__AllowWrites=true`, add the write permission set to the integration user if it is not already assigned (runbook section 8), and record the acting advisor.
