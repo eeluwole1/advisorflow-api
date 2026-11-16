@@ -77,4 +77,6 @@ The API can create and edit Salesforce records (ADR-008), but advisor sign-in is
 - **Decision:** the deployed API is **read-only**. `Features:AllowWrites` is `false` in `appsettings.json` and `true` only in `appsettings.Development.json`, so the safe value is the default and a missing setting can never enable writes.
 - **How:** a resource filter on every create/update endpoint answers `403` with a problem response before model binding, whatever the body. Reads are unaffected. Documented in the contract (1.2.1) and covered by `ReadOnlyModeApiTests`.
 - **Defence in depth:** Salesforce still enforces the integration user's permission sets (no delete, ADR-008), and the private key lives in Azure Key Vault, read by the App Service's managed identity (`Salesforce:PrivateKeyPem` as a Key Vault reference).
+- **API docs:** Swagger UI is mapped only in Development, so the deployed API does not publish its endpoint list (`/swagger` is `404`). The contract stays in `docs/api/openapi.v1.yaml`.
+- **Deployment record:** resource names, settings and redeploy steps are in the [Azure deployment runbook](../deployment/azure-deployment-runbook.md).
 - **Next:** writes are switched on in a deployed environment only once advisor sign-in (Microsoft Entra) protects them, together with recording the acting advisor (M7).

@@ -92,5 +92,6 @@ docs/                             Requirements, ADRs, API contract, testing, run
 - [API guide](docs/api/api-contracts.md) and [OpenAPI v1](docs/api/openapi.v1.yaml)
 - [Business rules status](docs/requirements/business-rules.md)
 - [Salesforce baseline and household migration runbook](docs/deployment/salesforce-baseline-runbook.md)
+- [Azure deployment runbook](docs/deployment/azure-deployment-runbook.md) (live: [web](https://zealous-pebble-02abce610.4.azurestaticapps.net), [API health](https://app-advisorflow-api-ee1.azurewebsites.net/health))
 - [M1 test evidence](docs/testing/m1-test-evidence.md)
 - Blueprint v1.3: `docs/requirements/AdvisorFlow_CRM_Project_Blueprint_v1.3.pdf`
