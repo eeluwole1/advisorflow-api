@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: AdvisorFlow API
-  version: 1.4.0
+  version: 1.5.0
   summary: Household CRM API consumed by advisorflow-web.
   description: |
     Versioned contract between advisorflow-api and advisorflow-web (blueprint v1.3 §11.5A).
@@ -29,6 +29,8 @@ info:
     - 1.4.0 (M5): follow-up tasks, read-only. `GET /api/activities` (open, overdue, closed or all),
       `GET /api/households/{id}/activities` and `GET /api/opportunities/{id}/activities`.
       Tasks are created in Salesforce, by people or by the follow-up Flow (ADR-011).
+    - 1.5.0 (M6): `GET /api/dashboard`, the practice dashboard: pipeline by stage with a weighted
+      forecast, won/lost outcomes, follow-up counts and households by status.
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -44,6 +46,8 @@ tags:
     description: Advisory opportunities (Salesforce Opportunities) for households.
   - name: Activities
     description: Follow-up tasks (Salesforce Tasks) on households and their opportunities.
+  - name: Dashboard
+    description: Practice-wide totals that reconcile to the records they summarize.
 paths:
   /health:
     get:
@@ -437,6 +441,24 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
+  /api/dashboard:
+    get:
+      tags: [Dashboard]
+      operationId: getDashboard
+      summary: Pipeline, outcomes, follow-ups and households in one summary
+      description: |
+        Added in 1.5.0. Counts and sums come from Salesforce aggregate queries over the same records
+        as the lists: advisory opportunities on households, tasks on households or their
+        opportunities, and household Accounts. Fees are advisory fees, not assets under management
+        (BR-OP-003). `asOf` is today in the practice's time zone (America/Winnipeg).
+      responses:
+        '200':
+          description: The dashboard.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardSummary' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 components:
   parameters:
     HouseholdId:
@@ -684,6 +706,79 @@ components:
         pageSize: { type: integer, minimum: 1 }
         totalCount: { type: integer, minimum: 0 }
         totalPages: { type: integer, minimum: 0 }
+    DashboardSummary:
+      type: object
+      required: [asOf, pipeline, outcomes, activities, households]
+      properties:
+        asOf: { type: string, format: date }
+        pipeline: { $ref: '#/components/schemas/PipelineSummary' }
+        outcomes: { $ref: '#/components/schemas/OutcomeSummary' }
+        activities: { $ref: '#/components/schemas/ActivitySummary' }
+        households: { $ref: '#/components/schemas/HouseholdCounts' }
+    PipelineSummary:
+      type: object
+      required: [openCount, openFees, weightedFees, stages]
+      properties:
+        openCount: { type: integer, minimum: 0 }
+        openFees: { type: number, minimum: 0, description: 'Sum of open advisory fees (no amount counts as 0).' }
+        weightedFees:
+          type: number
+          minimum: 0
+          description: Each open stage's fees times its probability, summed. A forecast, not a promise.
+        stages:
+          type: array
+          description: Every open stage in pipeline order, including empty ones.
+          items: { $ref: '#/components/schemas/StageSummary' }
+    StageSummary:
+      type: object
+      required: [stage, count, fees, probability, weightedFees]
+      properties:
+        stage: { $ref: '#/components/schemas/OpportunityStage' }
+        count: { type: integer, minimum: 0 }
+        fees: { type: number, minimum: 0 }
+        probability: { type: integer, minimum: 0, maximum: 100 }
+        weightedFees: { type: number, minimum: 0 }
+    OutcomeSummary:
+      type: object
+      required: [wonCount, wonFees, lostCount, lostFees, winRate, lossReasons]
+      properties:
+        wonCount: { type: integer, minimum: 0 }
+        wonFees: { type: number, minimum: 0 }
+        lostCount: { type: integer, minimum: 0 }
+        lostFees: { type: number, minimum: 0 }
+        winRate:
+          type: [number, 'null']
+          minimum: 0
+          maximum: 1
+          description: won / (won + lost); null when nothing has closed yet.
+        lossReasons:
+          type: array
+          description: Closed Lost opportunities by loss reason, most common first.
+          items: { $ref: '#/components/schemas/NamedCount' }
+    ActivitySummary:
+      type: object
+      required: [open, overdue, dueNext7Days, completed, openFromAutomation]
+      properties:
+        open: { type: integer, minimum: 0 }
+        overdue: { type: integer, minimum: 0, description: Open and due before today (BR-ACT-003). }
+        dueNext7Days: { type: integer, minimum: 0, description: 'Open and due from today to 6 days ahead.' }
+        completed: { type: integer, minimum: 0 }
+        openFromAutomation: { type: integer, minimum: 0, description: Open tasks the follow-up Flow created. }
+    HouseholdCounts:
+      type: object
+      required: [total, byStatus]
+      properties:
+        total: { type: integer, minimum: 0 }
+        byStatus:
+          type: array
+          description: Households per client status, in lifecycle order (Prospect, Active, Inactive).
+          items: { $ref: '#/components/schemas/NamedCount' }
+    NamedCount:
+      type: object
+      required: [name, count]
+      properties:
+        name: { type: string, description: '`Not set` when the CRM value is empty.' }
+        count: { type: integer, minimum: 1 }
     ProblemDetails:
       type: object
       description: RFC 9457 problem details.

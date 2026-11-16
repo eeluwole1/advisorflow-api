@@ -2,6 +2,7 @@ using AdvisorFlow.Api.ApiDocs;
 using AdvisorFlow.Api.ErrorHandling;
 using AdvisorFlow.Api.Features;
 using AdvisorFlow.Application.Activities;
+using AdvisorFlow.Application.Dashboard;
 using AdvisorFlow.Application.Households;
 using AdvisorFlow.Application.Opportunities;
 using AdvisorFlow.Infrastructure;
@@ -13,6 +14,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<HouseholdService>();
 builder.Services.AddScoped<OpportunityService>();
 builder.Services.AddScoped<ActivityService>();
+builder.Services.AddScoped<DashboardService>();
 builder.Services.Configure<ApiFeatures>(builder.Configuration.GetSection(ApiFeatures.SectionName));
 builder.Services.AddScoped<WritesEnabledFilter>();
 

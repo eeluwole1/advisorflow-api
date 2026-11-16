@@ -2,6 +2,7 @@ using AdvisorFlow.Application.Activities;
 using AdvisorFlow.Application.Households;
 using AdvisorFlow.Application.Opportunities;
 using AdvisorFlow.Domain.Activities;
+using AdvisorFlow.Domain.Dashboard;
 using AdvisorFlow.Domain.Households;
 using AdvisorFlow.Domain.Opportunities;
 
@@ -78,6 +79,13 @@ public interface ICrmDataProvider
 
     /// <summary>An advisory opportunity's tasks (up to 200, any order), or null when it does not exist.</summary>
     Task<IReadOnlyList<ActivityTask>?> GetOpportunityTasksAsync(string opportunityId, CancellationToken ct);
+
+    /// <summary>
+    /// Aggregates for the dashboard (M6): advisory opportunities per stage with their fees, loss
+    /// reasons of Closed Lost opportunities, follow-up task counts ("overdue" and "due in the next
+    /// 7 days" relative to <paramref name="today"/>), and households per client status.
+    /// </summary>
+    Task<DashboardData> GetDashboardDataAsync(DateOnly today, CancellationToken ct);
 }
 
 /// <summary>The CRM cannot be reached or is not configured. The API maps this to HTTP 503.</summary>

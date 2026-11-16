@@ -1,4 +1,4 @@
-# API guide (contract v1.4.0)
+# API guide (contract v1.5.0)
 
 The authoritative contract is [`openapi.v1.yaml`](openapi.v1.yaml), which `advisorflow-web` builds against. This page is a quick human-readable summary. If the two ever differ, the YAML wins, and `ContractTests` should catch the difference.
 
@@ -22,6 +22,7 @@ Base URL (local): `http://localhost:5080`. All responses are JSON. Errors use [R
 | GET | `/api/activities` (1.4) | `200` `PagedResponse<Activity>` (open first, by due date) | `400`, `502`, `503` |
 | GET | `/api/households/{id}/activities` (1.4) | `200` `Activity[]` (incl. its opportunities' tasks) | `400`, `404`, `502`, `503` |
 | GET | `/api/opportunities/{id}/activities` (1.4) | `200` `Activity[]` | `400`, `404`, `502`, `503` |
+| GET | `/api/dashboard` (1.5) | `200` `DashboardSummary` | `502`, `503` |
 
 There is no `DELETE`. A household is deactivated by setting `clientStatus` to `Inactive`; an opportunity ends as Closed Won or Closed Lost (ADR-008).
 
@@ -108,6 +109,15 @@ Prospecting → Qualification → Needs Assessment → Proposal Presented → Ne
 | `householdId` | — | A 15- or 18-character record id; includes tasks on the household's opportunities |
 
 **Tasks are read-only in the API.** Advisors log them in Salesforce, and the follow-up Flow creates them when an opportunity enters Qualification or Proposal Presented (BR-ACT-001/002, ADR-011); `automation` says which. Every list puts open tasks first, then sorts by due date (tasks without one last), then subject. **Overdue** means open with a due date before today in the practice's time zone, America/Winnipeg (BR-ACT-003, ADR-012); a task due today is not overdue.
+
+## The dashboard, `GET /api/dashboard` (1.5)
+
+One summary from Salesforce aggregate queries (`GROUP BY`, `COUNT`, `SUM`) over the same records as the lists, so it reconciles with them (blueprint M6 exit criterion, ADR-013):
+
+- `pipeline`: open advisory opportunities, every open stage listed in order (even empty), fees per stage (no amount counts as 0) and `weightedFees` = fees × the stage's probability.
+- `outcomes`: won and lost counts and fees, `winRate` = won / (won + lost) or null, and loss reasons, most common first.
+- `activities`: open, overdue (BR-ACT-003), due in the next 7 days (today to today + 6, never overlapping overdue), completed, and open tasks the follow-up Flow created.
+- `households`: total and per client status (Prospect, Active, Inactive; an empty status reads `Not set`).
 
 ## Status codes
 
