@@ -20,7 +20,7 @@ advisorflow-web (Angular) ──HTTPS/JSON, contract v1──► AdvisorFlow.Api
 
 Where the project stands, what's next and how we work: [`docs/project-status.md`](docs/project-status.md).
 
-- **Follow-up automation (M5, done):** the Salesforce Flow `AdvisorFlow_Opportunity_Follow_Ups` creates a follow-up task when an opportunity enters Qualification and a review task on Proposal Presented, without duplicates (BR-ACT-001/002, ADR-011). Verified with `scripts/verify-follow-up-flow.apex`.
+- **Follow-up automation (M5, done):** the Salesforce Flow `AdvisorFlow_Opportunity_Follow_Ups` creates a follow-up task when an opportunity enters Qualification and a review task on Proposal Presented, without duplicates (BR-ACT-001/002, ADR-011). Tested in Salesforce by the Apex test class `OpportunityFollowUpFlowTest` (10 tests, including a 200-record bulk insert).
 - **Activities API (M5, contract 1.4):** `GET /api/activities` (open, overdue, closed or all; overdue in America/Winnipeg time), a household's tasks and an opportunity's tasks. Read-only, so it also works on the Azure deployment (ADR-012).
 
 - **Households (M1–M3):** list (search, status filter, paging), detail, members; create and update households and members, with the primary-member rule. No delete (ADR-008).

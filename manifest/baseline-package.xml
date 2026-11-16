@@ -17,6 +17,10 @@
         <name>CustomObject</name>
     </types>
     <types>
+        <members>OpportunityFollowUpFlowTest</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
         <members>Activity.Automation__c</members>
         <name>CustomField</name>
     </types>

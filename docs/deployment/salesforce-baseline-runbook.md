@@ -318,3 +318,22 @@ sf data query --target-org advisorflow-integration --query "SELECT Id, Subject, 
 A missing field shows as *No such column 'X' on entity 'Task'*. Result on 16 Nov 2026: succeeds (0 records, since the verification script rolls its tasks back).
 
 To keep this in the repo, the manifest now also lists the **Task** object and the **Minimum Access - API Only Integrations** profile (a profile's Task field access is only retrieved when Task is in the same retrieve). The first retrieve after this change added `objects/Task/` and the integration profile, added `ActivitiesAccess` to the read permission set, and added default Task/Event field entries to the other profiles. The flow file came back with Salesforce's auto-layout positions (0,0), which is harmless.
+
+### 10f. Apex test class
+
+`force-app/main/default/classes/OpportunityFollowUpFlowTest.cls` tests the Flow inside Salesforce: 10 `@IsTest` methods with `Assert` checks, each building its own household and opportunity (Salesforce rolls test data back). The last one inserts 200 opportunities in one transaction to prove the Flow is bulk-safe.
+
+```powershell
+# validate and run the tests without saving
+sf project deploy start --target-org advisorflow-dev --dry-run `
+  --source-dir force-app/main/default/classes `
+  --test-level RunSpecifiedTests --tests OpportunityFollowUpFlowTest
+# deploy, then run the tests on their own
+sf project deploy start --target-org advisorflow-dev `
+  --source-dir force-app/main/default/classes `
+  --test-level RunSpecifiedTests --tests OpportunityFollowUpFlowTest
+sf apex run test --target-org advisorflow-dev --class-names OpportunityFollowUpFlowTest --result-format human --wait 10
+```
+
+Lesson recorded: the first version of the bulk test failed with *Too many SOQL queries: 101* because the test's own helper queried the household on every loop iteration. The helper now takes the household id, queried once before the loop. Result on 16 Nov 2026: 10/10 passing.
+
