@@ -214,3 +214,55 @@ Real changes: the new field, both permission sets, +4 lines in each Contact layo
 | Create | `sf data create record --target-org advisorflow-integration --sobject Contact --values "FirstName=Delete LastName=Test AccountId=001fj00002Et3AfAAJ"` | Success: `003fj00001vIicLAAS` |
 | Delete | `sf data delete record --target-org advisorflow-integration --sobject Contact --record-id 003fj00001vIicLAAS` | **Rejected:** `INSUFFICIENT_ACCESS_OR_READONLY` (expected) |
 | Clean-up | same delete with `--target-org advisorflow-dev` (admin) | Test contact removed (Recycle Bin) |
+
+## 9. Advisory opportunity pipeline (M4)
+
+Done on 15 Nov 2026, following ADR-010. All clicks are in Setup → Object Manager → Opportunity unless stated.
+
+### 9a. Stages
+
+Fields & Relationships → **Stage** → *Opportunity Stages Picklist Values* → **New** (the button in that section, not the custom-field New):
+
+| Stage | Type | Probability | Forecast Category |
+|---|---|---|---|
+| Needs Assessment | Open | 30% | Pipeline |
+| Proposal Presented | Open | 60% | Best Case |
+
+### 9b. Sales process and record type
+
+- Setup → Feature Settings → Sales → **Sales Processes** → New, from Master: **AdvisorFlow Advisory**, selected values Prospecting, Qualification, Needs Assessment, Proposal Presented, Negotiation/Review, Closed Won, Closed Lost (the other five standard stages are left out, not deleted).
+- **Record Types** → New, from Master: **Advisory Engagement** (`Advisory_Engagement`), sales process AdvisorFlow Advisory, active; available and default for System Administrator; *Opportunity Layout* for all profiles.
+
+### 9c. Fields
+
+Restricted picklists, added to the Opportunity layouts. Check the **Field Name** before saving: Salesforce may fill it from the first value.
+
+| Field | API name | Values |
+|---|---|---|
+| Service Type | `Service_Type__c` | Retirement Planning, Investment Advisory, Financial Review, Other |
+| Engagement Priority | `Engagement_Priority__c` | Low, Medium, High |
+| Loss Reason | `Loss_Reason__c` | Chose another advisor, Fees, Timing, Needs changed, No response, Other |
+
+### 9d. Validation rule (BR-OP-002)
+
+**Validation Rules** → New: `Loss_Reason_Required_When_Closed_Lost`, active, error on the Loss Reason field: *Select a Loss Reason when the stage is Closed Lost.*
+
+```
+AND(
+  ISPICKVAL(StageName, "Closed Lost"),
+  ISBLANK(TEXT(Loss_Reason__c))
+)
+```
+
+### 9e. Permission sets
+
+| Permission set | Opportunity | Fields |
+|---|---|---|
+| `AdvisorFlow_API_Read` | Read, View All Records | Read: Account Name, Amount, Close Date, Engagement Priority, Loss Reason, Next Step, Probability, Service Type, Stage |
+| `AdvisorFlow_API_Write` | Read, Create, Edit (no Delete) | Edit: Account Name, Amount, Engagement Priority, Loss Reason, Next Step, Service Type (Close Date, Stage and Name are automatic). Record type Advisory Engagement assigned |
+
+Click **Save** on the permission set page before retrieving: an unsaved edit retrieves as read-only (`editable=false`).
+
+### 9f. Retrieve into the repo
+
+No manifest change was needed: the `Opportunity` CustomObject brings its fields, record type, business process and validation rule. `./scripts/retrieve-baseline.ps1` added 326 lines and removed none (committed as `1ee06c4`).

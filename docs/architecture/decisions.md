@@ -80,3 +80,15 @@ The API can create and edit Salesforce records (ADR-008), but advisor sign-in is
 - **API docs:** Swagger UI is mapped only in Development, so the deployed API does not publish its endpoint list (`/swagger` is `404`). The contract stays in `docs/api/openapi.v1.yaml`.
 - **Deployment record:** resource names, settings and redeploy steps are in the [Azure deployment runbook](../deployment/azure-deployment-runbook.md).
 - **Next:** writes are switched on in a deployed environment only once advisor sign-in (Microsoft Entra) protects them, together with recording the acting advisor (M7).
+
+## ADR-010: Advisory opportunity pipeline (M4)
+**Status:** Approved, 15 Nov 2026
+
+The blueprint (§9) proposes the stages but leaves the stage-transition rule (BR-OP-004) to a business decision.
+
+- **Own sales process.** Opportunities use the record type **Advisory Engagement**, whose sales process **AdvisorFlow Advisory** allows only the seven blueprint stages. Two values were added to the org's stage picklist (*Needs Assessment* 30% Pipeline, *Proposal Presented* 60% Best Case); the org's standard stages and defaults are untouched, as the blueprint asks. The API reads and writes only Advisory Engagement opportunities on household Accounts.
+- **Stage rule (BR-OP-004).** An opportunity may move **forward any number of stages** (including straight to Closed Won or Closed Lost) or **back one stage** to correct a mistake. **Closed Won and Closed Lost are final:** their stage cannot change, though other fields can be corrected. Enforced in the API (`OpportunityStages.CheckChange`); an invalid change is `400` with a `stage` error. Alternatives considered: forward-only (too strict for honest mistakes) and no rule (leaves BR-OP-004 unenforced).
+- **Loss reason (BR-OP-002).** New picklist `Loss_Reason__c`. Salesforce enforces it with the validation rule `Loss_Reason_Required_When_Closed_Lost`; the API checks first so callers get a field error instead of a `502`, and also refuses a loss reason on any other stage.
+- **Amount (BR-OP-003).** The standard Amount field holds estimated advisory service revenue, never assets under management. The contract, API guide and UI labels say so.
+- **Access.** `AdvisorFlow API Read` reads Opportunity (View All) and the fields used; `AdvisorFlow API Write` adds Create and Edit (no Delete, ADR-008), edit access to the fields the API writes, and the Advisory Engagement record type. Probability stays read-only: Salesforce sets it from the stage.
+- **Automation (BR-ACT-001/002)** on stage changes, such as the Qualification follow-up task, is a Salesforce Flow in M5, not API code.

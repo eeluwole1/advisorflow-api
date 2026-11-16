@@ -20,6 +20,8 @@ public class ReadOnlyModeApiTests(MockApiFactory factory) : IClassFixture<MockAp
         { "PUT", "/api/households/001MOCK00000000001" },
         { "POST", "/api/households/001MOCK00000000001/contacts" },
         { "PUT", "/api/households/001MOCK00000000001/contacts/003MOCK00000000001" },
+        { "POST", "/api/households/001MOCK00000000001/opportunities" },
+        { "PUT", "/api/opportunities/006MOCK00000000001" },
     };
 
     [Theory]
@@ -28,7 +30,7 @@ public class ReadOnlyModeApiTests(MockApiFactory factory) : IClassFixture<MockAp
     {
         using var request = new HttpRequestMessage(new HttpMethod(method), url)
         {
-            Content = JsonContent.Create(new { name = "Any", lastName = "Any", clientStatus = "Active" }),
+            Content = JsonContent.Create(new { name = "Any", lastName = "Any", clientStatus = "Active", stage = "Prospecting", closeDate = "2027-01-31" }),
         };
 
         var response = await _client.SendAsync(request);
@@ -53,5 +55,13 @@ public class ReadOnlyModeApiTests(MockApiFactory factory) : IClassFixture<MockAp
         var page = await _client.GetStringAsync("/api/households?search=Should%20Not%20Exist");
 
         Assert.Contains("\"totalCount\":0", page);
+    }
+
+    [Fact]
+    public async Task Opportunity_reads_still_work()
+    {
+        var response = await _client.GetAsync("/api/opportunities");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 }

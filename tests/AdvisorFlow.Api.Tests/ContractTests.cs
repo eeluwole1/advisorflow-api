@@ -74,6 +74,38 @@ public class ContractTests(MockApiFactory factory) : IClassFixture<MockApiFactor
         AssertMatchesSchema(updatedBody.RootElement, "HouseholdMember");
     }
 
+    [Fact]
+    public async Task Opportunity_reads_match_contract() // v1.3
+    {
+        using var page = await GetJson("/api/opportunities?pageSize=2");
+        AssertMatchesSchema(page.RootElement, "OpportunityPage");
+        AssertMatchesSchema(page.RootElement.GetProperty("items")[0], "Opportunity");
+
+        using var detail = await GetJson("/api/opportunities/006MOCK00000000002");
+        AssertMatchesSchema(detail.RootElement, "Opportunity");
+
+        using var household = await GetJson("/api/households/001MOCK00000000002/opportunities");
+        AssertMatchesSchema(household.RootElement[0], "Opportunity");
+    }
+
+    [Fact]
+    public async Task Opportunity_create_and_update_responses_match_contract() // v1.3
+    {
+        var created = await _client.PostAsJsonAsync(
+            "/api/households/001MOCK00000000007/opportunities", new { name = "Contract Opportunity", closeDate = "2027-01-31" });
+        Assert.Equal(System.Net.HttpStatusCode.Created, created.StatusCode);
+        using var createdBody = JsonDocument.Parse(await created.Content.ReadAsStringAsync());
+        AssertMatchesSchema(createdBody.RootElement, "Opportunity");
+        Assert.Equal("2027-01-31", createdBody.RootElement.GetProperty("closeDate").GetString());
+
+        var id = createdBody.RootElement.GetProperty("id").GetString();
+        var updated = await _client.PutAsJsonAsync(
+            $"/api/opportunities/{id}", new { name = "Contract Opportunity", stage = "Qualification", closeDate = "2027-01-31" });
+        updated.EnsureSuccessStatusCode();
+        using var updatedBody = JsonDocument.Parse(await updated.Content.ReadAsStringAsync());
+        AssertMatchesSchema(updatedBody.RootElement, "Opportunity");
+    }
+
     private async Task<JsonDocument> GetJson(string url)
     {
         var response = await _client.GetAsync(url);

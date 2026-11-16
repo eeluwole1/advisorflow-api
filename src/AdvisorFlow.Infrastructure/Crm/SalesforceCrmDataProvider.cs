@@ -14,7 +14,7 @@ namespace AdvisorFlow.Infrastructure.Crm;
 /// Behaves like <see cref="MockCrmDataProvider"/>: same filters, ordering and paging,
 /// so the API contract and the web app do not change when the provider does.
 /// </summary>
-public sealed class SalesforceCrmDataProvider(SalesforceRestClient salesforce) : ICrmDataProvider
+public sealed partial class SalesforceCrmDataProvider(SalesforceRestClient salesforce) : ICrmDataProvider
 {
     /// <summary>SOQL rejects OFFSET values above 2,000. Pages beyond it come back empty.</summary>
     public const int MaxOffset = 2000;

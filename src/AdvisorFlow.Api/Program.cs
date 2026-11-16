@@ -2,6 +2,7 @@ using AdvisorFlow.Api.ApiDocs;
 using AdvisorFlow.Api.ErrorHandling;
 using AdvisorFlow.Api.Features;
 using AdvisorFlow.Application.Households;
+using AdvisorFlow.Application.Opportunities;
 using AdvisorFlow.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 // --- Application + infrastructure ---------------------------------------------
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<HouseholdService>();
+builder.Services.AddScoped<OpportunityService>();
 builder.Services.Configure<ApiFeatures>(builder.Configuration.GetSection(ApiFeatures.SectionName));
 builder.Services.AddScoped<WritesEnabledFilter>();
 
@@ -24,7 +26,7 @@ const string FrontendCors = "Frontend";
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddPolicy(FrontendCors, policy => policy
     .WithOrigins(allowedOrigins)
-    .WithMethods("GET", "POST", "PUT") // No DELETE: households are deactivated, not deleted (ADR-008).
+    .WithMethods("GET", "POST", "PUT") // No DELETE: records are deactivated or closed, not deleted (ADR-008).
     .AllowAnyHeader()));
 
 var app = builder.Build();

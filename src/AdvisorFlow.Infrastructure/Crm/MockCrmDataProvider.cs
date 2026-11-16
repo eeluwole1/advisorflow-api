@@ -12,7 +12,7 @@ namespace AdvisorFlow.Infrastructure.Crm;
 /// Each instance starts from the same seed data and keeps its own changes in memory
 /// (lost on restart), so tests and local runs never affect each other.
 /// </summary>
-public sealed class MockCrmDataProvider : ICrmDataProvider
+public sealed partial class MockCrmDataProvider : ICrmDataProvider
 {
     private static readonly IReadOnlyList<Household> SeedHouseholds =
     [

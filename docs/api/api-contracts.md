@@ -1,4 +1,4 @@
-# API guide (contract v1.2.1)
+# API guide (contract v1.3.0)
 
 The authoritative contract is [`openapi.v1.yaml`](openapi.v1.yaml), which `advisorflow-web` builds against. This page is a quick human-readable summary. If the two ever differ, the YAML wins, and `ContractTests` should catch the difference.
 
@@ -14,8 +14,13 @@ Base URL (local): `http://localhost:5080`. All responses are JSON. Errors use [R
 | PUT | `/api/households/{id}` (1.1) | `200` `HouseholdDetail` | `400`, `404`, `502`, `503` |
 | POST | `/api/households/{id}/contacts` (1.2) | `201` `HouseholdMember` + `Location` header | `400`, `404`, `502`, `503` |
 | PUT | `/api/households/{id}/contacts/{contactId}` (1.2) | `200` `HouseholdMember` | `400`, `404`, `502`, `503` |
+| GET | `/api/opportunities` (1.3) | `200` `PagedResponse<Opportunity>` (by close date) | `400`, `502`, `503` |
+| GET | `/api/opportunities/{id}` (1.3) | `200` `Opportunity` | `400`, `404`, `502`, `503` |
+| GET | `/api/households/{id}/opportunities` (1.3) | `200` `Opportunity[]` (by close date) | `400`, `404`, `502`, `503` |
+| POST | `/api/households/{id}/opportunities` (1.3) | `201` `Opportunity` + `Location` header | `400`, `404`, `502`, `503` |
+| PUT | `/api/opportunities/{id}` (1.3) | `200` `Opportunity` | `400`, `404`, `502`, `503` |
 
-There is no `DELETE`. A household is deactivated by setting `clientStatus` to `Inactive` (ADR-008).
+There is no `DELETE`. A household is deactivated by setting `clientStatus` to `Inactive`; an opportunity ends as Closed Won or Closed Lost (ADR-008).
 
 ## Query parameters for `GET /api/households`
 
@@ -58,6 +63,37 @@ There is no `DELETE`. A household is deactivated by setting `clientStatus` to `I
 - The current primary cannot be un-set: `400` with an `isPrimary` error. Make another member primary instead.
 - Members cannot be moved to another household or removed (ADR-008).
 
+## Query parameters for `GET /api/opportunities`
+
+| Name | Default | Rules |
+|---|---|---|
+| `page`, `pageSize`, `search` | 1, 20, — | As for households; `search` matches the opportunity name |
+| `stage` | — | One stage (see below), case-insensitive |
+| `householdId` | — | A 15- or 18-character record id |
+
+## Body for `POST /api/households/{id}/opportunities` and `PUT /api/opportunities/{id}`
+
+```jsonc
+{ "name": "Okafor Household - Investment Advisory", // required, 1–120 characters
+  "stage": "Proposal Presented",   // POST: defaults to Prospecting. PUT: required
+  "closeDate": "2026-12-01",       // required, yyyy-MM-dd (BR-OP-001)
+  "amount": 12000,                 // advisory service revenue, NOT assets under management (BR-OP-003); ≥ 0, 2 decimals, or null
+  "serviceType": "Investment Advisory", // Retirement Planning | Investment Advisory | Financial Review | Other, or null
+  "engagementPriority": "Medium",  // Low | Medium | High, or null
+  "nextStep": "Follow up on the proposal", // ≤ 255 characters, or null
+  "lossReason": null }             // required for Closed Lost, not allowed otherwise (BR-OP-002)
+```
+
+**Stages and the stage rule (BR-OP-004, ADR-010)**
+
+Prospecting → Qualification → Needs Assessment → Proposal Presented → Negotiation/Review → Closed Won / Closed Lost.
+
+- Forward any number of stages, including straight to Closed Won or Closed Lost.
+- Back **one** stage, to correct a mistake. Further back: `400` with a `stage` error.
+- Closed Won and Closed Lost are final: changing the stage of a closed opportunity is `400`. Its other fields can still be edited.
+- `probability` is set by Salesforce from the stage and is read-only. The household cannot be changed after creation.
+- Salesforce also enforces BR-OP-002 with a validation rule, in case a change bypasses the API.
+
 `{id}` and `{contactId}` must be 15- or 18-character alphanumeric Salesforce record ids; anything else returns `400`. This also keeps malformed input out of future SOQL queries.
 
 ## Status codes
@@ -66,7 +102,7 @@ There is no `DELETE`. A household is deactivated by setting `clientStatus` to `I
 |---|---|
 | 400 | Invalid query parameter, id or request body. `errors` lists each field. |
 | 403 | Create/update on a read-only deployment (`Features:AllowWrites` is false, e.g. on Azure until sign-in exists; ADR-009). |
-| 404 | Household does not exist (or is not a household), or the member is not in that household. |
+| 404 | Household does not exist (or is not a household), the member is not in that household, or the opportunity does not exist (or is not an advisory opportunity on a household). |
 | 502 | The CRM returned an error or unusable data. |
 | 503 | The CRM is unreachable or the provider is not configured. |
 | 405 | Method not supported, for example `DELETE` (ADR-008). |
@@ -88,6 +124,12 @@ There is no `DELETE`. A household is deactivated by setting `clientStatus` to `I
 { "id": "003MOCK00000000001", "householdId": "001MOCK00000000001", "firstName": "James",
   "lastName": "Williams", "fullName": "James Williams", "email": "james.williams@example.com",
   "phone": "204-555-0101", "preferredContactMethod": "Phone", "isPrimary": true }
+
+// Opportunity
+{ "id": "006MOCK00000000002", "householdId": "001MOCK00000000002", "householdName": "Okafor Household",
+  "name": "Okafor Household - Investment Advisory", "stage": "Proposal Presented", "isClosed": false,
+  "closeDate": "2026-12-01", "amount": 12000, "probability": 60, "serviceType": "Investment Advisory",
+  "engagementPriority": "Medium", "nextStep": "Follow up on the proposal", "lossReason": null }
 
 // PagedResponse<T>
 { "items": [ /* T */ ], "page": 1, "pageSize": 20, "totalCount": 7, "totalPages": 1 }

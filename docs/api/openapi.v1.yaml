@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: AdvisorFlow API
-  version: 1.2.1
+  version: 1.3.0
   summary: Household CRM API consumed by advisorflow-web.
   description: |
     Versioned contract between advisorflow-api and advisorflow-web (blueprint v1.3 §11.5A).
@@ -22,6 +22,10 @@ info:
     - 1.2.0 (M3): `POST /api/households/{id}/contacts` and
       `PUT /api/households/{id}/contacts/{contactId}`, with the primary-member rule (BR-HH-003).
     - 1.2.1: documents `403` on create/update when a deployment is read-only (ADR-009).
+    - 1.3.0 (M4): advisory opportunities. `GET /api/opportunities` (the pipeline),
+      `GET /api/opportunities/{id}`, `GET` and `POST /api/households/{id}/opportunities`, and
+      `PUT /api/opportunities/{id}`, with BR-OP-001 to BR-OP-004 (ADR-010). No delete: an
+      opportunity ends as Closed Won or Closed Lost.
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -33,6 +37,8 @@ tags:
     description: Service liveness.
   - name: Households
     description: Households (Salesforce Accounts) and their members (Contacts).
+  - name: Opportunities
+    description: Advisory opportunities (Salesforce Opportunities) for households.
 paths:
   /health:
     get:
@@ -221,6 +227,134 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
+  /api/households/{id}/opportunities:
+    get:
+      tags: [Opportunities]
+      operationId: listHouseholdOpportunities
+      summary: A household's opportunities, ordered by close date
+      description: Added in 1.3.0.
+      parameters:
+        - $ref: '#/components/parameters/HouseholdId'
+      responses:
+        '200':
+          description: The household's opportunities; empty when it has none.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Opportunity' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    post:
+      tags: [Opportunities]
+      operationId: createOpportunity
+      summary: Create an opportunity for a household
+      description: |
+        Added in 1.3.0. `stage` defaults to `Prospecting`. Closed Lost needs a `lossReason`,
+        and only Closed Lost may have one (BR-OP-001, BR-OP-002).
+      parameters:
+        - $ref: '#/components/parameters/HouseholdId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OpportunityCreate' }
+      responses:
+        '201':
+          description: The opportunity was created.
+          headers:
+            Location:
+              description: URL of the new opportunity.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Opportunity' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/ReadOnly' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/opportunities:
+    get:
+      tags: [Opportunities]
+      operationId: listOpportunities
+      summary: The opportunity pipeline
+      description: Added in 1.3.0. Ordered by close date, then name.
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: search
+          in: query
+          description: Case-insensitive match on opportunity name.
+          schema: { type: string, maxLength: 80 }
+        - name: stage
+          in: query
+          description: One stage only. Matching is case-insensitive.
+          schema: { $ref: '#/components/schemas/OpportunityStage' }
+        - name: householdId
+          in: query
+          description: Only this household's opportunities.
+          schema: { type: string, pattern: '^[a-zA-Z0-9]{15}([a-zA-Z0-9]{3})?$' }
+      responses:
+        '200':
+          description: One page of opportunities.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OpportunityPage' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /api/opportunities/{id}:
+    get:
+      tags: [Opportunities]
+      operationId: getOpportunity
+      summary: Opportunity detail
+      description: Added in 1.3.0.
+      parameters:
+        - $ref: '#/components/parameters/OpportunityId'
+      responses:
+        '200':
+          description: The opportunity.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Opportunity' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+    put:
+      tags: [Opportunities]
+      operationId: updateOpportunity
+      summary: Replace an opportunity's editable fields
+      description: |
+        Added in 1.3.0. Every editable field is replaced: an omitted or empty optional field is
+        cleared. The stage may stay, move forward any number of stages, or move back one stage;
+        a Closed Won or Closed Lost opportunity keeps its stage (400 with a `stage` error,
+        BR-OP-004, ADR-010). The household cannot be changed.
+      parameters:
+        - $ref: '#/components/parameters/OpportunityId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OpportunityUpdate' }
+      responses:
+        '200':
+          description: The updated opportunity.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Opportunity' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/ReadOnly' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/UpstreamError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 components:
   parameters:
     HouseholdId:
@@ -234,6 +368,12 @@ components:
       in: path
       required: true
       description: 15- or 18-character Salesforce Contact id of a member of this household.
+      schema: { type: string, pattern: '^[a-zA-Z0-9]{15}([a-zA-Z0-9]{3})?$' }
+    OpportunityId:
+      name: id
+      in: path
+      required: true
+      description: 15- or 18-character Salesforce Opportunity id.
       schema: { type: string, pattern: '^[a-zA-Z0-9]{15}([a-zA-Z0-9]{3})?$' }
   schemas:
     ClientStatus:
@@ -339,6 +479,87 @@ components:
           type: [string, 'null']
           description: Email, Phone or SMS. Not the same as marketing consent (BR-SEC-002).
         isPrimary: { type: boolean }
+    OpportunityStage:
+      type: string
+      description: |
+        The AdvisorFlow Advisory sales process, in pipeline order (blueprint §9). Matching is
+        case-insensitive on input. Closed Won and Closed Lost are final (BR-OP-004).
+      enum: [Prospecting, Qualification, Needs Assessment, Proposal Presented, Negotiation/Review, Closed Won, Closed Lost]
+    ServiceType:
+      type: string
+      description: Matching is case-insensitive on input.
+      enum: [Retirement Planning, Investment Advisory, Financial Review, Other]
+    LossReason:
+      type: string
+      description: Matching is case-insensitive on input. Required for Closed Lost only (BR-OP-002).
+      enum: [Chose another advisor, Fees, Timing, Needs changed, No response, Other]
+    OpportunityCreate:
+      type: object
+      required: [name, closeDate]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        stage:
+          description: Defaults to Prospecting when omitted.
+          $ref: '#/components/schemas/OpportunityStage'
+        closeDate: { type: string, format: date, description: 'Expected close date, yyyy-MM-dd (BR-OP-001).' }
+        amount:
+          type: [number, 'null']
+          minimum: 0
+          multipleOf: 0.01
+          description: Estimated advisory service revenue, not assets under management (BR-OP-003).
+        serviceType:
+          oneOf:
+            - $ref: '#/components/schemas/ServiceType'
+            - type: 'null'
+        engagementPriority:
+          oneOf:
+            - $ref: '#/components/schemas/Priority'
+            - type: 'null'
+        nextStep: { type: [string, 'null'], maxLength: 255 }
+        lossReason:
+          oneOf:
+            - $ref: '#/components/schemas/LossReason'
+            - type: 'null'
+    OpportunityUpdate:
+      description: Same fields as OpportunityCreate; `stage` is required because PUT replaces every field.
+      allOf:
+        - $ref: '#/components/schemas/OpportunityCreate'
+        - type: object
+          required: [stage]
+    Opportunity:
+      type: object
+      required: [id, householdId, householdName, name, stage, isClosed, closeDate, amount, probability, serviceType, engagementPriority, nextStep, lossReason]
+      properties:
+        id: { type: string }
+        householdId: { type: string }
+        householdName: { type: string }
+        name: { type: string }
+        stage: { $ref: '#/components/schemas/OpportunityStage' }
+        isClosed: { type: boolean, description: True for Closed Won and Closed Lost. }
+        closeDate: { type: string, format: date }
+        amount:
+          type: [number, 'null']
+          description: Estimated advisory service revenue, not assets under management (BR-OP-003).
+        probability:
+          type: [integer, 'null']
+          minimum: 0
+          maximum: 100
+          description: Percent, set by Salesforce from the stage. Read-only.
+        serviceType: { type: [string, 'null'] }
+        engagementPriority: { type: [string, 'null'] }
+        nextStep: { type: [string, 'null'] }
+        lossReason: { type: [string, 'null'], description: Set only when the stage is Closed Lost. }
+    OpportunityPage:
+      type: object
+      required: [items, page, pageSize, totalCount, totalPages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Opportunity' }
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1 }
+        totalCount: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
     ProblemDetails:
       type: object
       description: RFC 9457 problem details.
@@ -366,7 +587,7 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/ProblemDetails' }
     NotFound:
-      description: The household, or the member within it, does not exist.
+      description: The household, the member within it, or the opportunity does not exist.
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/ProblemDetails' }

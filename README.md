@@ -1,6 +1,6 @@
 # advisorflow-api
 
-The backend for **AdvisorFlow CRM**, a financial advisory CRM prototype. It's an ASP.NET Core Web API that serves households and their members to [`advisorflow-web`](../advisorflow-web) and mediates all access to **Salesforce Developer Edition**, the CRM system of record. This repository also owns the Salesforce DX metadata and the project documentation.
+The backend for **AdvisorFlow CRM**, a financial advisory CRM prototype. It's an ASP.NET Core Web API that serves households, their members and advisory opportunities to [`advisorflow-web`](../advisorflow-web) and mediates all access to **Salesforce Developer Edition**, the CRM system of record. This repository also owns the Salesforce DX metadata and the project documentation.
 
 > Portfolio prototype. All records are fictional.
 
@@ -8,20 +8,22 @@ The backend for **AdvisorFlow CRM**, a financial advisory CRM prototype. It's an
 advisorflow-web (Angular) ──HTTPS/JSON, contract v1──► AdvisorFlow.Api
                                                         │ controllers · error mapping
                                                    AdvisorFlow.Application
-                                                        │ HouseholdService · validation · DTOs
+                                                        │ HouseholdService · OpportunityService · validation · DTOs
                                                         │ ICrmDataProvider
                                                    AdvisorFlow.Infrastructure
                                                    ├─ MockCrmDataProvider        (local development)
                                                    └─ SalesforceCrmDataProvider  (M2, server-side OAuth) ──► Salesforce DE
-                                                   AdvisorFlow.Domain  (Household, HouseholdMember, rules)
+                                                   AdvisorFlow.Domain  (Household, HouseholdMember, Opportunity, rules)
 ```
 
-## Current status: milestone M2, Salesforce integration
+## Current status: milestone M4, opportunities
 
-- `GET /health`, `GET /api/households` (search, status filter, paging), `GET /api/households/{id}`, `GET /api/households/{id}/contacts`
-- Mock provider with seven fictional households (default, and always used by the tests).
-- Salesforce provider: signs in as a read-only integration user with the OAuth 2.0 JWT bearer flow, caches the access token, and reads households (Accounts with the `Household` record type) and their members (Contacts) with SOQL.
-- Errors use problem details: 400 / 404 / 502 / 503
+- **Households (M1–M3):** list (search, status filter, paging), detail, members; create and update households and members, with the primary-member rule. No delete (ADR-008).
+- **Opportunities (M4, contract 1.3):** the pipeline (`GET /api/opportunities`, filter by stage or household), detail, a household's opportunities, create and update with the stage rule: forward any number, back one, closed is final (BR-OP-004, ADR-010).
+- Mock provider with seven fictional households and seven opportunities (default, and always used by the tests).
+- Salesforce provider: signs in as the integration user with the OAuth 2.0 JWT bearer flow and works only with `Household` Accounts and `Advisory_Engagement` Opportunities.
+- Deployed on Azure, read-only until advisor sign-in exists (ADR-009).
+- Errors use problem details: 400 / 403 / 404 / 502 / 503
 - Versioned OpenAPI contract: [`docs/api/openapi.v1.yaml`](docs/api/openapi.v1.yaml)
 
 ## Run locally
@@ -57,6 +59,10 @@ The `salesforce` profile only sets `Crm__Provider=Salesforce`; the connection se
 |---|---|
 | `HouseholdServiceTests` | Validation, record id shape, paging, search, filtering, member ordering |
 | `HouseholdApiTests` | Every endpoint over HTTP; 400/404/502/503; no upstream detail leaks |
+| `OpportunityStageRuleTests`, `OpportunityServiceTests` | Stage rule (BR-OP-004), validation (BR-OP-001 to 003), create/update workflow |
+| `OpportunityApiTests` | Opportunity endpoints over HTTP, including the stage and loss-reason errors |
+| `SalesforceProviderTests`, `SalesforceOpportunityTests` | SOQL, mapping, writes and error handling against a fake Salesforce |
+| `ReadOnlyModeApiTests` | Every create/update is 403 when writes are off (ADR-009) |
 | `ContractTests` | Response JSON fields equal the required fields in `openapi.v1.yaml` |
 | `ArchitectureTests` | Layer rules: Domain ← Application ← Infrastructure ← Api |
 | `ApiDocsTests` | Swagger UI and contract served in Development, 404 in Production |
@@ -78,7 +84,7 @@ Change the contract and the code in the same pull request. `ContractTests` fails
 ```
 src/AdvisorFlow.Api/              HTTP surface, composition root
 src/AdvisorFlow.Application/      Use cases, validation, DTOs, ICrmDataProvider
-src/AdvisorFlow.Domain/           Household model and business values
+src/AdvisorFlow.Domain/           Household and opportunity models and business values
 src/AdvisorFlow.Infrastructure/   CRM providers (mock, Salesforce)
 tests/AdvisorFlow.Api.Tests/      xUnit tests
 force-app/main/default/           Salesforce metadata (filled by the M2 baseline retrieval)
