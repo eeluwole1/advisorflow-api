@@ -1,6 +1,8 @@
+using AdvisorFlow.Api.Auth;
 using AdvisorFlow.Api.Features;
 using AdvisorFlow.Application.Households;
 using AdvisorFlow.Application.Opportunities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AdvisorFlow.Api.Controllers;
@@ -12,7 +14,7 @@ namespace AdvisorFlow.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/opportunities")]
-public sealed class OpportunitiesController(OpportunityService opportunities) : ControllerBase
+public sealed class OpportunitiesController(OpportunityService opportunities, ILogger<OpportunitiesController> logger) : ControllerBase
 {
     /// <summary>The pipeline: paginated opportunities ordered by close date, optionally filtered.</summary>
     [HttpGet]
@@ -70,7 +72,9 @@ public sealed class OpportunitiesController(OpportunityService opportunities) : 
 
     /// <summary>Creates an opportunity for a household. Stage defaults to Prospecting (BR-OP-001, BR-OP-002).</summary>
     [HttpPost("~/api/households/{id}/opportunities")]
+    [Authorize(Policy = AdvisorAuth.AdvisorPolicy)]
     [ServiceFilter<WritesEnabledFilter>]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<OpportunityDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -88,7 +92,13 @@ public sealed class OpportunitiesController(OpportunityService opportunities) : 
             return ValidationProblem(new ValidationProblemDetails(errors));
         }
 
-        var result = await opportunities.CreateOpportunityAsync(id, draft!, ct);
+        var result = await opportunities.CreateOpportunityAsync(id, draft! with { ChangedBy = User.AuditLabel() }, ct);
+        if (result.Status == OpportunityWriteStatus.Ok)
+        {
+            logger.LogInformation("Opportunity {OpportunityId} created for household {HouseholdId} by advisor {AdvisorId}",
+                result.Opportunity!.Id, id, User.AdvisorId());
+        }
+
         return result.Status == OpportunityWriteStatus.Ok
             ? CreatedAtAction(nameof(Get), new { id = result.Opportunity!.Id }, result.Opportunity)
             : ToProblem(result.Status);
@@ -99,7 +109,9 @@ public sealed class OpportunitiesController(OpportunityService opportunities) : 
     /// move forward any number of stages or back one; a closed opportunity keeps its stage (BR-OP-004).
     /// </summary>
     [HttpPut("{id}")]
+    [Authorize(Policy = AdvisorAuth.AdvisorPolicy)]
     [ServiceFilter<WritesEnabledFilter>]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<OpportunityDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -117,7 +129,13 @@ public sealed class OpportunitiesController(OpportunityService opportunities) : 
             return ValidationProblem(new ValidationProblemDetails(errors));
         }
 
-        var result = await opportunities.UpdateOpportunityAsync(id, draft!, ct);
+        var result = await opportunities.UpdateOpportunityAsync(id, draft! with { ChangedBy = User.AuditLabel() }, ct);
+        if (result.Status == OpportunityWriteStatus.Ok)
+        {
+            logger.LogInformation("Opportunity {OpportunityId} updated (stage {Stage}) by advisor {AdvisorId}",
+                id, result.Opportunity!.Stage, User.AdvisorId());
+        }
+
         return result.Status == OpportunityWriteStatus.Ok ? Ok(result.Opportunity) : ToProblem(result.Status);
     }
 

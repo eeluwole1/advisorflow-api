@@ -1,4 +1,5 @@
 using AdvisorFlow.Api.ApiDocs;
+using AdvisorFlow.Api.Auth;
 using AdvisorFlow.Api.ErrorHandling;
 using AdvisorFlow.Api.Features;
 using AdvisorFlow.Application.Activities;
@@ -17,6 +18,9 @@ builder.Services.AddScoped<ActivityService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.Configure<ApiFeatures>(builder.Configuration.GetSection(ApiFeatures.SectionName));
 builder.Services.AddScoped<WritesEnabledFilter>();
+
+// --- Sign-in for changes (ADR-015): reads are anonymous, writes need an Entra advisor token ---
+builder.Services.AddAdvisorAuth(builder.Configuration);
 
 // --- Web API plumbing ---------------------------------------------------------
 builder.Services.AddControllers();
@@ -50,6 +54,8 @@ else
 }
 
 app.UseCors(FrontendCors);
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapHealthChecks("/health");
 app.MapControllers();
@@ -57,6 +63,12 @@ app.MapControllers();
 app.Logger.LogInformation("AdvisorFlow API started with CRM provider: {Provider}; writes allowed: {AllowWrites}",
     app.Configuration["Crm:Provider"] ?? "Mock",
     app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<ApiFeatures>>().Value.AllowWrites);
+
+var authSettings = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<AuthSettings>>().Value;
+if (!authSettings.IsConfigured)
+{
+    app.Logger.LogWarning("Auth:TenantId and Auth:ClientId are not set, so every create/update answers 401. Reads are unaffected.");
+}
 
 app.Run();
 

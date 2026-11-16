@@ -17,6 +17,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Validates Microsoft Entra ID access tokens on create/update endpoints (ADR-015). -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\AdvisorFlow.Application\AdvisorFlow.Application.csproj" />
     <ProjectReference Include="..\AdvisorFlow.Infrastructure\AdvisorFlow.Infrastructure.csproj" />
   </ItemGroup>

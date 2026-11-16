@@ -121,7 +121,7 @@ public sealed partial class SalesforceCrmDataProvider
 
     /// <summary>Editable Opportunity fields. Null values clear the field (PUT semantics).
     /// Probability is left to Salesforce, which sets it from the stage.</summary>
-    private static Dictionary<string, object?> ToOpportunityFields(OpportunityDraft draft) => new()
+    private static Dictionary<string, object?> ToOpportunityFields(OpportunityDraft draft) => WithChangedBy(new()
     {
         ["Name"] = draft.Name,
         ["StageName"] = draft.Stage,
@@ -131,7 +131,7 @@ public sealed partial class SalesforceCrmDataProvider
         ["Engagement_Priority__c"] = draft.EngagementPriority,
         ["NextStep"] = draft.NextStep,
         ["Loss_Reason__c"] = draft.LossReason,
-    };
+    }, draft.ChangedBy);
 
     /// <summary>The org's Id of the Opportunity record type "Advisory_Engagement", looked up once and cached.</summary>
     private async Task<string> GetAdvisoryRecordTypeIdAsync(CancellationToken ct)

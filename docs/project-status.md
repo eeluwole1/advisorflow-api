@@ -22,7 +22,7 @@ A financial advisory CRM prototype: advisors see **households**, their **members
 | M4 Opportunities | **Done** | Own sales process + Advisory Engagement record type, stage rule (ADR-010), loss reason, pipeline page and household opportunities on the web |
 | M5 Activities and automation | **Done** | Done: Flow + Apex tests (ADR-011), activities API (1.4.0, ADR-012), web Activities page, Follow-ups LWC with Apex and Jest tests |
 | M6 Analytics | **Done (16 Nov)** | `GET /api/dashboard` (1.5.0, aggregate SOQL, ADR-013) + web Dashboard page; reconciliation tests pin the seed totals |
-| M7 Azure hardening | Partly done early | Deployed read-only (ADR-009) with Key Vault, CI/CD on push; still to do: Entra sign-in, then enable writes, monitoring, smoke/security tests |
+| M7 Azure hardening | **In progress (16 Nov)** | Deployed read-only (ADR-009) with Key Vault, CI/CD on push, Salesforce validation in CI (ADR-014). Built: Entra sign-in for changes (ADR-015), acting advisor recorded (ADR-016), six web forms. To do: Entra registrations in the owner's own directory, configure IDs, enable writes live, verify end to end; then monitoring |
 
 ## Why this project, and the deadline
 
@@ -73,6 +73,10 @@ Decisions already made with the owner:
 ## Related
 
 - Interview script (story, architecture, war stories, Q&A, demo): https://claude.ai/artifact/6B9BkDMA7eoGR1r7GrY1bc
+
+## M7 status (16 Nov)
+
+- Code done in both repos (API 1.6.0 + tests; web sign-in, forms, 37 tests). Waiting on: the owner's Entra directory (Azure free account with a personal Microsoft account, because RRC blocks app registrations), the two registrations, then IDs into config. Runbook: `docs/deployment/entra-sign-in-runbook.md`.
 
 ## Known gaps
 

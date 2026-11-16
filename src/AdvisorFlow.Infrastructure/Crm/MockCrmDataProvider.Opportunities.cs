@@ -91,6 +91,7 @@ public sealed partial class MockCrmDataProvider
                 Seed(_nextOpportunity++, householdId, draft.Name, draft.Stage, draft.CloseDate, null, null, null, null, null),
                 draft);
             _opportunities.Add(opportunity);
+            RecordChange(opportunity.Id, draft.ChangedBy);
             return Task.FromResult(WithCurrentHouseholdName(opportunity));
         }
     }
@@ -108,6 +109,7 @@ public sealed partial class MockCrmDataProvider
             // Id and household are not editable through the API.
             var updated = Apply(_opportunities[index], draft);
             _opportunities[index] = updated;
+            RecordChange(id, draft.ChangedBy);
             return Task.FromResult<Opportunity?>(WithCurrentHouseholdName(updated));
         }
     }

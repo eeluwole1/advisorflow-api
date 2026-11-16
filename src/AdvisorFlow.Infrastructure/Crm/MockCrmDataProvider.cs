@@ -52,8 +52,30 @@ public sealed partial class MockCrmDataProvider : ICrmDataProvider
     private readonly Lock _lock = new();
     private readonly List<Household> _households = [.. SeedHouseholds];
     private readonly List<HouseholdMember> _members = [.. SeedMembers];
+    private readonly Dictionary<string, string> _changedBy = new(StringComparer.Ordinal);
     private int _nextHousehold = SeedHouseholds.Count + 1;
     private int _nextMember = SeedMembers.Count + 1;
+
+    /// <summary>
+    /// The advisor who last changed a record through the API (ADR-016), as the Salesforce provider
+    /// writes to <c>AdvisorFlow_Changed_By__c</c>. Null when unknown or never changed.
+    /// </summary>
+    public string? LastChangedBy(string recordId)
+    {
+        lock (_lock)
+        {
+            return _changedBy.GetValueOrDefault(recordId);
+        }
+    }
+
+    /// <summary>Remembers who changed a record. Caller holds the lock.</summary>
+    private void RecordChange(string recordId, string? changedBy)
+    {
+        if (!string.IsNullOrWhiteSpace(changedBy))
+        {
+            _changedBy[recordId] = changedBy;
+        }
+    }
 
     private List<Household> Households
     {
@@ -131,6 +153,7 @@ public sealed partial class MockCrmDataProvider : ICrmDataProvider
                 $"001MOCK{_nextHousehold++:D11}", draft.Name, draft.ClientStatus,
                 draft.RiskProfile, draft.Priority, draft.Phone, AccountNumber: null);
             _households.Add(household);
+            RecordChange(household.Id, draft.ChangedBy);
             return Task.FromResult(household);
         }
     }
@@ -155,6 +178,7 @@ public sealed partial class MockCrmDataProvider : ICrmDataProvider
                 Phone = draft.Phone,
             };
             _households[index] = updated;
+            RecordChange(id, draft.ChangedBy);
             return Task.FromResult<Household?>(updated);
         }
     }
@@ -178,6 +202,7 @@ public sealed partial class MockCrmDataProvider : ICrmDataProvider
                 $"003MOCK{_nextMember++:D11}", householdId, draft.FirstName ?? string.Empty, draft.LastName,
                 draft.Email, draft.Phone, draft.PreferredContactMethod, draft.IsPrimary);
             _members.Add(member);
+            RecordChange(member.Id, draft.ChangedBy);
             return Task.FromResult(member);
         }
     }
@@ -207,6 +232,7 @@ public sealed partial class MockCrmDataProvider : ICrmDataProvider
                 IsPrimary = draft.IsPrimary,
             };
             _members[index] = updated;
+            RecordChange(memberId, draft.ChangedBy);
             return Task.FromResult<HouseholdMember?>(updated);
         }
     }

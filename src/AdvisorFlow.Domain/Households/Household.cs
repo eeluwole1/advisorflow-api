@@ -71,7 +71,11 @@ public sealed record HouseholdDraft(
     string ClientStatus,
     string? RiskProfile,
     string? Priority,
-    string? Phone);
+    string? Phone)
+{
+    /// <summary>The signed-in advisor making the change, as recorded in the CRM (ADR-016). Null in tests and tools.</summary>
+    public string? ChangedBy { get; init; }
+}
 
 /// <summary>Approved Preferred Contact Method values (verified against the Salesforce picklist, M2).</summary>
 public static class ContactMethods
@@ -95,4 +99,8 @@ public sealed record MemberDraft(
     string? Email,
     string? Phone,
     string? PreferredContactMethod,
-    bool IsPrimary);
+    bool IsPrimary)
+{
+    /// <summary>The signed-in advisor making the change, as recorded in the CRM (ADR-016). Null in tests and tools.</summary>
+    public string? ChangedBy { get; init; }
+}

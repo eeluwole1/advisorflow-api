@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: AdvisorFlow API
-  version: 1.5.0
+  version: 1.6.0
   summary: Household CRM API consumed by advisorflow-web.
   description: |
     Versioned contract between advisorflow-api and advisorflow-web (blueprint v1.3 §11.5A).
@@ -31,6 +31,10 @@ info:
       Tasks are created in Salesforce, by people or by the follow-up Flow (ADR-011).
     - 1.5.0 (M6): `GET /api/dashboard`, the practice dashboard: pipeline by stage with a weighted
       forecast, won/lost outcomes, follow-up counts and households by status.
+    - 1.6.0 (M7): sign-in for changes (ADR-015). Reads stay anonymous; every create/update needs a
+      Microsoft Entra ID access token for the API (`advisorToken`) with the `Advisor` app role and
+      the `access_as_user` scope, else `401` (no or invalid token) or `403` (not an advisor, or the
+      deployment is read-only). The acting advisor is recorded on the changed record (ADR-016).
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary
@@ -102,6 +106,8 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/HouseholdCreate' }
+      security:
+        - advisorToken: []
       responses:
         '201':
           description: The household was created.
@@ -113,7 +119,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/HouseholdDetail' }
         '400': { $ref: '#/components/responses/ValidationError' }
-        '403': { $ref: '#/components/responses/ReadOnly' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
   /api/households/{id}:
@@ -131,6 +138,8 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/HouseholdUpdate' }
+      security:
+        - advisorToken: []
       responses:
         '200':
           description: The updated household.
@@ -138,7 +147,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/HouseholdDetail' }
         '400': { $ref: '#/components/responses/ValidationError' }
-        '403': { $ref: '#/components/responses/ReadOnly' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -192,6 +202,8 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/MemberWrite' }
+      security:
+        - advisorToken: []
       responses:
         '201':
           description: The member was added.
@@ -203,7 +215,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/HouseholdMember' }
         '400': { $ref: '#/components/responses/ValidationError' }
-        '403': { $ref: '#/components/responses/ReadOnly' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -225,6 +238,8 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/MemberWrite' }
+      security:
+        - advisorToken: []
       responses:
         '200':
           description: The updated member.
@@ -232,7 +247,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/HouseholdMember' }
         '400': { $ref: '#/components/responses/ValidationError' }
-        '403': { $ref: '#/components/responses/ReadOnly' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -270,6 +286,8 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/OpportunityCreate' }
+      security:
+        - advisorToken: []
       responses:
         '201':
           description: The opportunity was created.
@@ -281,7 +299,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Opportunity' }
         '400': { $ref: '#/components/responses/ValidationError' }
-        '403': { $ref: '#/components/responses/ReadOnly' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -353,6 +372,8 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/OpportunityUpdate' }
+      security:
+        - advisorToken: []
       responses:
         '200':
           description: The updated opportunity.
@@ -360,7 +381,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Opportunity' }
         '400': { $ref: '#/components/responses/ValidationError' }
-        '403': { $ref: '#/components/responses/ReadOnly' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -460,6 +482,15 @@ paths:
         '502': { $ref: '#/components/responses/UpstreamError' }
         '503': { $ref: '#/components/responses/Unavailable' }
 components:
+  securitySchemes:
+    advisorToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Microsoft Entra ID access token issued for the AdvisorFlow API (scope `access_as_user`),
+        obtained by advisorflow-web with MSAL (authorization code flow with PKCE). Writes also
+        require the `Advisor` app role in the token's `roles` claim (ADR-015).
   parameters:
     HouseholdId:
       name: id
@@ -798,10 +829,18 @@ components:
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/ProblemDetails' }
-    ReadOnly:
+    Unauthorized:
       description: |
-        This deployment is read-only (`Features:AllowWrites` is false), so no change was made.
-        Returned before the body is read (ADR-009).
+        No access token, or the token is not a valid Entra token for this API (expired, wrong
+        audience or directory). Sign in and retry (ADR-015).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+    Forbidden:
+      description: |
+        No change was made. Either the signed-in user lacks the `Advisor` role or the
+        `access_as_user` scope (ADR-015), or this deployment is read-only
+        (`Features:AllowWrites` is false; returned before the body is read, ADR-009).
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/ProblemDetails' }

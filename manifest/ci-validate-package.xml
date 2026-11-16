@@ -18,7 +18,10 @@
         <name>LightningComponentBundle</name>
     </types>
     <types>
+        <members>Account.AdvisorFlow_Changed_By__c</members>
         <members>Activity.Automation__c</members>
+        <members>Contact.AdvisorFlow_Changed_By__c</members>
+        <members>Opportunity.AdvisorFlow_Changed_By__c</members>
         <name>CustomField</name>
     </types>
     <types>

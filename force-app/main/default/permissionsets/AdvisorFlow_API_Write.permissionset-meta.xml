@@ -3,6 +3,11 @@
     <description>Create and edit households (Account) and members (Contact) for the AdvisorFlow API. No delete (ADR-008).</description>
     <fieldPermissions>
         <editable>true</editable>
+        <field>Account.AdvisorFlow_Changed_By__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
         <field>Account.Client_Risk_Profile__c</field>
         <readable>true</readable>
     </fieldPermissions>
@@ -28,6 +33,11 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>true</editable>
+        <field>Contact.AdvisorFlow_Changed_By__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
         <field>Contact.Email</field>
         <readable>true</readable>
     </fieldPermissions>
@@ -49,6 +59,11 @@
     <fieldPermissions>
         <editable>true</editable>
         <field>Opportunity.AccountId</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Opportunity.AdvisorFlow_Changed_By__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>

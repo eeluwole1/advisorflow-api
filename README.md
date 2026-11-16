@@ -16,11 +16,12 @@ advisorflow-web (Angular) ──HTTPS/JSON, contract v1──► AdvisorFlow.Api
                                                    AdvisorFlow.Domain  (Household, HouseholdMember, Opportunity, ActivityTask, rules)
 ```
 
-## Current status: milestone M6, dashboard
+## Current status: milestone M7, sign-in and changes (in progress)
 
 Where the project stands, what's next and how we work: [`docs/project-status.md`](docs/project-status.md).
 
 - **Follow-up automation (M5, done):** the Salesforce Flow `AdvisorFlow_Opportunity_Follow_Ups` creates a follow-up task when an opportunity enters Qualification and a review task on Proposal Presented, without duplicates (BR-ACT-001/002, ADR-011). Tested in Salesforce by the Apex test class `OpportunityFollowUpFlowTest` (10 tests, including a 200-record bulk insert).
+- **Sign-in for changes (M7, contract 1.6):** reads stay public; the six create/update endpoints need a Microsoft Entra ID access token with the Advisor role (ADR-015), and every change records the acting advisor in Salesforce and the log (ADR-016). Setup: [Entra sign-in runbook](docs/deployment/entra-sign-in-runbook.md).
 - **Dashboard (M6, contract 1.5):** `GET /api/dashboard`, pipeline by stage with a weighted forecast, won/lost and win rate, follow-up counts and households by status, from aggregate SOQL; totals reconcile to the lists (ADR-013).
 - **Activities API (M5, contract 1.4):** `GET /api/activities` (open, overdue, closed or all; overdue in America/Winnipeg time), a household's tasks and an opportunity's tasks. Read-only, so it also works on the Azure deployment (ADR-012).
 

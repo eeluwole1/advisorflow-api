@@ -427,3 +427,19 @@ Results on 16 Nov 2026:
 | Secret | `SF_CI_USERNAME` | `advisorflow.ci@eeluwole.dev` (a secret, so it is masked in logs) |
 
 The job is **Salesforce validate (deploy dry-run + Apex tests)** in `.github/workflows/ci.yml`; its JUnit and coverage results are uploaded as the `salesforce-validate-results` artifact.
+
+## 12. Last changed by (AdvisorFlow) (ADR-016, M7)
+
+Text field `AdvisorFlow_Changed_By__c` (255) on Account, Contact and Opportunity, set by the API to the signed-in advisor on every create/update. Access: `AdvisorFlow API Write` read + edit, `AdvisorFlow API Read` read. Both permission sets and the three fields are source; deploy:
+
+```powershell
+sf project deploy start --target-org advisorflow-dev --dry-run `
+  --source-dir force-app/main/default/objects/Account/fields/AdvisorFlow_Changed_By__c.field-meta.xml `
+  --source-dir force-app/main/default/objects/Contact/fields/AdvisorFlow_Changed_By__c.field-meta.xml `
+  --source-dir force-app/main/default/objects/Opportunity/fields/AdvisorFlow_Changed_By__c.field-meta.xml `
+  --source-dir force-app/main/default/permissionsets/AdvisorFlow_API_Read.permissionset-meta.xml `
+  --source-dir force-app/main/default/permissionsets/AdvisorFlow_API_Write.permissionset-meta.xml
+# same command without --dry-run
+```
+
+Then System Administrator: Object Manager → each object → Fields & Relationships → **Last changed by (AdvisorFlow)** → Set Field-Level Security → Visible + **Read-Only** (as in §10c). The CI validation manifest includes the three fields.

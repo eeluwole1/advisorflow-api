@@ -185,8 +185,22 @@ public sealed partial class SalesforceCrmDataProvider(SalesforceRestClient sales
             .ToList();
     }
 
+    /// <summary>Text field on Account, Contact and Opportunity holding the advisor who last changed the record through AdvisorFlow (ADR-016).</summary>
+    internal const string ChangedByField = "AdvisorFlow_Changed_By__c";
+
+    /// <summary>Adds the acting advisor to a write, when known. Salesforce's own Last Modified By stays the integration user.</summary>
+    internal static Dictionary<string, object?> WithChangedBy(Dictionary<string, object?> fields, string? changedBy)
+    {
+        if (!string.IsNullOrWhiteSpace(changedBy))
+        {
+            fields[ChangedByField] = changedBy.Length <= 255 ? changedBy : changedBy[..255];
+        }
+
+        return fields;
+    }
+
     /// <summary>Editable Contact fields. Null values clear the field (PUT semantics).</summary>
-    private static Dictionary<string, object?> ToContactFields(MemberDraft draft) => new()
+    private static Dictionary<string, object?> ToContactFields(MemberDraft draft) => WithChangedBy(new()
     {
         ["FirstName"] = draft.FirstName,
         ["LastName"] = draft.LastName,
@@ -194,17 +208,17 @@ public sealed partial class SalesforceCrmDataProvider(SalesforceRestClient sales
         ["Phone"] = draft.Phone,
         ["Preferred_Contact_Method__c"] = draft.PreferredContactMethod,
         ["Is_Primary_Member__c"] = draft.IsPrimary,
-    };
+    }, draft.ChangedBy);
 
     /// <summary>Editable Account fields. Null values clear the field (PUT semantics).</summary>
-    private static Dictionary<string, object?> ToAccountFields(HouseholdDraft draft) => new()
+    private static Dictionary<string, object?> ToAccountFields(HouseholdDraft draft) => WithChangedBy(new()
     {
         ["Name"] = draft.Name,
         ["Client_Status__c"] = draft.ClientStatus,
         ["Client_Risk_Profile__c"] = draft.RiskProfile,
         ["CustomerPriority__c"] = draft.Priority,
         ["Phone"] = draft.Phone,
-    };
+    }, draft.ChangedBy);
 
     /// <summary>The org's Id of the Account record type "Household", looked up once and cached.</summary>
     private async Task<string> GetHouseholdRecordTypeIdAsync(CancellationToken ct)

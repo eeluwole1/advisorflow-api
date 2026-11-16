@@ -33,7 +33,11 @@ public sealed record OpportunityDraft(
     string? ServiceType,
     string? EngagementPriority,
     string? NextStep,
-    string? LossReason);
+    string? LossReason)
+{
+    /// <summary>The signed-in advisor making the change, as recorded in the CRM (ADR-016). Null in tests and tools.</summary>
+    public string? ChangedBy { get; init; }
+}
 
 /// <summary>
 /// The AdvisorFlow Advisory sales process (blueprint §9), in pipeline order, and the

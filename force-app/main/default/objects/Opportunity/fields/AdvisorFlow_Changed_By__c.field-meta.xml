@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>AdvisorFlow_Changed_By__c</fullName>
+    <description>The signed-in advisor who last changed this advisory opportunity through AdvisorFlow (ADR-016). Set only by the AdvisorFlow API from the advisor's Microsoft Entra ID sign-in; Last Modified By shows the integration user.</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Who last changed this record in the AdvisorFlow app. Changes made directly in Salesforce do not update it.</inlineHelpText>
+    <label>Last changed by (AdvisorFlow)</label>
+    <length>255</length>
+    <required>false</required>
+    <trackFeedHistory>false</trackFeedHistory>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

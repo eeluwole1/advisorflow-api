@@ -1,4 +1,4 @@
-# API guide (contract v1.5.0)
+# API guide (contract v1.6.0)
 
 The authoritative contract is [`openapi.v1.yaml`](openapi.v1.yaml), which `advisorflow-web` builds against. This page is a quick human-readable summary. If the two ever differ, the YAML wins, and `ContractTests` should catch the difference.
 
@@ -10,19 +10,21 @@ Base URL (local): `http://localhost:5080`. All responses are JSON. Errors use [R
 | GET | `/api/households` | `200` `PagedResponse<HouseholdSummary>` | `400`, `502`, `503` |
 | GET | `/api/households/{id}` | `200` `HouseholdDetail` | `400`, `404`, `502`, `503` |
 | GET | `/api/households/{id}/contacts` | `200` `HouseholdMember[]` (primary first) | `400`, `404`, `502`, `503` |
-| POST | `/api/households` (1.1) | `201` `HouseholdDetail` + `Location` header | `400`, `502`, `503` |
-| PUT | `/api/households/{id}` (1.1) | `200` `HouseholdDetail` | `400`, `404`, `502`, `503` |
-| POST | `/api/households/{id}/contacts` (1.2) | `201` `HouseholdMember` + `Location` header | `400`, `404`, `502`, `503` |
-| PUT | `/api/households/{id}/contacts/{contactId}` (1.2) | `200` `HouseholdMember` | `400`, `404`, `502`, `503` |
+| POST | `/api/households` (1.1) 🔒 | `201` `HouseholdDetail` + `Location` header | `400`, `401`, `403`, `502`, `503` |
+| PUT | `/api/households/{id}` (1.1) 🔒 | `200` `HouseholdDetail` | `400`, `401`, `403`, `404`, `502`, `503` |
+| POST | `/api/households/{id}/contacts` (1.2) 🔒 | `201` `HouseholdMember` + `Location` header | `400`, `401`, `403`, `404`, `502`, `503` |
+| PUT | `/api/households/{id}/contacts/{contactId}` (1.2) 🔒 | `200` `HouseholdMember` | `400`, `401`, `403`, `404`, `502`, `503` |
 | GET | `/api/opportunities` (1.3) | `200` `PagedResponse<Opportunity>` (by close date) | `400`, `502`, `503` |
 | GET | `/api/opportunities/{id}` (1.3) | `200` `Opportunity` | `400`, `404`, `502`, `503` |
 | GET | `/api/households/{id}/opportunities` (1.3) | `200` `Opportunity[]` (by close date) | `400`, `404`, `502`, `503` |
-| POST | `/api/households/{id}/opportunities` (1.3) | `201` `Opportunity` + `Location` header | `400`, `404`, `502`, `503` |
-| PUT | `/api/opportunities/{id}` (1.3) | `200` `Opportunity` | `400`, `404`, `502`, `503` |
+| POST | `/api/households/{id}/opportunities` (1.3) 🔒 | `201` `Opportunity` + `Location` header | `400`, `401`, `403`, `404`, `502`, `503` |
+| PUT | `/api/opportunities/{id}` (1.3) 🔒 | `200` `Opportunity` | `400`, `401`, `403`, `404`, `502`, `503` |
 | GET | `/api/activities` (1.4) | `200` `PagedResponse<Activity>` (open first, by due date) | `400`, `502`, `503` |
 | GET | `/api/households/{id}/activities` (1.4) | `200` `Activity[]` (incl. its opportunities' tasks) | `400`, `404`, `502`, `503` |
 | GET | `/api/opportunities/{id}/activities` (1.4) | `200` `Activity[]` | `400`, `404`, `502`, `503` |
 | GET | `/api/dashboard` (1.5) | `200` `DashboardSummary` | `502`, `503` |
+
+🔒 = needs a signed-in advisor (1.6, ADR-015): `Authorization: Bearer <Entra access token for the API>` with the `Advisor` role and the `access_as_user` scope. Without a valid token the answer is `401`; signed in without the role or scope, or on a read-only deployment, `403`. Every GET is anonymous. Each change records the advisor in Salesforce's *Last changed by (AdvisorFlow)* field (ADR-016).
 
 There is no `DELETE`. A household is deactivated by setting `clientStatus` to `Inactive`; an opportunity ends as Closed Won or Closed Lost (ADR-008).
 

@@ -1,5 +1,7 @@
+using AdvisorFlow.Api.Auth;
 using AdvisorFlow.Api.Features;
 using AdvisorFlow.Application.Households;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AdvisorFlow.Api.Controllers;
@@ -7,7 +9,7 @@ namespace AdvisorFlow.Api.Controllers;
 /// <summary>Household endpoints: reads (M1, blueprint §11.7), household create/update (M3, v1.1) and member create/update (M3, v1.2).</summary>
 [ApiController]
 [Route("api/households")]
-public sealed class HouseholdsController(HouseholdService households) : ControllerBase
+public sealed class HouseholdsController(HouseholdService households, ILogger<HouseholdsController> logger) : ControllerBase
 {
     /// <summary>Paginated household summaries, optionally filtered by name and status.</summary>
     [HttpGet]
@@ -64,7 +66,9 @@ public sealed class HouseholdsController(HouseholdService households) : Controll
 
     /// <summary>Creates a household. Client Status defaults to Prospect.</summary>
     [HttpPost]
+    [Authorize(Policy = AdvisorAuth.AdvisorPolicy)]
     [ServiceFilter<WritesEnabledFilter>]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<HouseholdDetailDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -76,7 +80,8 @@ public sealed class HouseholdsController(HouseholdService households) : Controll
             return ValidationProblem(new ValidationProblemDetails(errors));
         }
 
-        var created = await households.CreateHouseholdAsync(draft!, ct);
+        var created = await households.CreateHouseholdAsync(draft! with { ChangedBy = User.AuditLabel() }, ct);
+        logger.LogInformation("Household {HouseholdId} created by advisor {AdvisorId}", created.Id, User.AdvisorId());
         return CreatedAtAction(nameof(Get), new { id = created.Id }, created);
     }
 
@@ -85,7 +90,9 @@ public sealed class HouseholdsController(HouseholdService households) : Controll
     /// There is no delete: set Client Status to Inactive to deactivate (ADR-008).
     /// </summary>
     [HttpPut("{id}")]
+    [Authorize(Policy = AdvisorAuth.AdvisorPolicy)]
     [ServiceFilter<WritesEnabledFilter>]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<HouseholdDetailDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -103,13 +110,20 @@ public sealed class HouseholdsController(HouseholdService households) : Controll
             return ValidationProblem(new ValidationProblemDetails(errors));
         }
 
-        var updated = await households.UpdateHouseholdAsync(id, draft!, ct);
+        var updated = await households.UpdateHouseholdAsync(id, draft! with { ChangedBy = User.AuditLabel() }, ct);
+        if (updated is not null)
+        {
+            logger.LogInformation("Household {HouseholdId} updated by advisor {AdvisorId}", id, User.AdvisorId());
+        }
+
         return updated is null ? HouseholdNotFound() : Ok(updated);
     }
 
     /// <summary>Adds a member. The household's first member becomes primary automatically (BR-HH-003).</summary>
     [HttpPost("{id}/contacts")]
+    [Authorize(Policy = AdvisorAuth.AdvisorPolicy)]
     [ServiceFilter<WritesEnabledFilter>]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<HouseholdMemberDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -127,7 +141,13 @@ public sealed class HouseholdsController(HouseholdService households) : Controll
             return ValidationProblem(new ValidationProblemDetails(errors));
         }
 
-        var result = await households.CreateMemberAsync(id, draft!, ct);
+        var result = await households.CreateMemberAsync(id, draft! with { ChangedBy = User.AuditLabel() }, ct);
+        if (result.Status == MemberWriteStatus.Ok)
+        {
+            logger.LogInformation("Member {MemberId} added to household {HouseholdId} by advisor {AdvisorId}",
+                result.Member!.Id, id, User.AdvisorId());
+        }
+
         return result.Status == MemberWriteStatus.Ok
             ? CreatedAtAction(nameof(Contacts), new { id }, result.Member)
             : ToProblem(result.Status);
@@ -138,7 +158,9 @@ public sealed class HouseholdsController(HouseholdService households) : Controll
     /// clears the previous one; the current primary cannot be un-set directly (BR-HH-003).
     /// </summary>
     [HttpPut("{id}/contacts/{contactId}")]
+    [Authorize(Policy = AdvisorAuth.AdvisorPolicy)]
     [ServiceFilter<WritesEnabledFilter>]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<HouseholdMemberDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -157,7 +179,13 @@ public sealed class HouseholdsController(HouseholdService households) : Controll
             return ValidationProblem(new ValidationProblemDetails(errors));
         }
 
-        var result = await households.UpdateMemberAsync(id, contactId, draft!, ct);
+        var result = await households.UpdateMemberAsync(id, contactId, draft! with { ChangedBy = User.AuditLabel() }, ct);
+        if (result.Status == MemberWriteStatus.Ok)
+        {
+            logger.LogInformation("Member {MemberId} of household {HouseholdId} updated by advisor {AdvisorId}",
+                contactId, id, User.AdvisorId());
+        }
+
         return result.Status == MemberWriteStatus.Ok ? Ok(result.Member) : ToProblem(result.Status);
     }
 
