@@ -16,7 +16,7 @@ advisorflow-web (Angular) ──HTTPS/JSON, contract v1──► AdvisorFlow.Api
                                                    AdvisorFlow.Domain  (Household, HouseholdMember, Opportunity, ActivityTask, rules)
 ```
 
-## Current status: milestone M7, sign-in and changes (in progress)
+## Current status: milestone M7, sign-in and live changes
 
 Where the project stands, what's next and how we work: [`docs/project-status.md`](docs/project-status.md).
 

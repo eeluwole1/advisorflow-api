@@ -22,7 +22,7 @@ A financial advisory CRM prototype: advisors see **households**, their **members
 | M4 Opportunities | **Done** | Own sales process + Advisory Engagement record type, stage rule (ADR-010), loss reason, pipeline page and household opportunities on the web |
 | M5 Activities and automation | **Done** | Done: Flow + Apex tests (ADR-011), activities API (1.4.0, ADR-012), web Activities page, Follow-ups LWC with Apex and Jest tests |
 | M6 Analytics | **Done (16 Nov)** | `GET /api/dashboard` (1.5.0, aggregate SOQL, ADR-013) + web Dashboard page; reconciliation tests pin the seed totals |
-| M7 Azure hardening | **In progress (16 Nov)** | Deployed read-only (ADR-009) with Key Vault, CI/CD on push, Salesforce validation in CI (ADR-014). Built: Entra sign-in for changes (ADR-015), acting advisor recorded (ADR-016), six web forms. To do: Entra registrations in the owner's own directory, configure IDs, enable writes live, verify end to end; then monitoring |
+| M7 Azure hardening | **Done except monitoring (16 Nov)** | Key Vault, CI/CD, Salesforce validation in CI (ADR-014); Entra sign-in for changes with an Advisor role (ADR-015), acting advisor recorded in Salesforce and logs (ADR-016), six web forms; **writes enabled live** and verified end to end (Patel Household → Flow follow-up). Left: monitoring (Application Insights), budget alert |
 
 ## Why this project, and the deadline
 
@@ -76,7 +76,9 @@ Decisions already made with the owner:
 
 ## M7 status (16 Nov)
 
-- Code done in both repos (API 1.6.0 + tests; web sign-in, forms, 37 tests). Waiting on: the owner's Entra directory (Azure free account with a personal Microsoft account, because RRC blocks app registrations), the two registrations, then IDs into config. Runbook: `docs/deployment/entra-sign-in-runbook.md`.
+- Live: anyone can browse; an advisor signs in with Microsoft (personal Entra directory, because RRC blocks app registrations) and creates/edits households, members and opportunities. Verified with Patel Household / Priya Patel: the stage move made the Salesforce Flow create the follow-up, and *Last changed by (AdvisorFlow)* = `elusiyan eluwole`. Runbook: `docs/deployment/entra-sign-in-runbook.md` §6.
+- Two Microsoft logins: RRC account for Azure resources (`az`), personal account for signing in to AdvisorFlow and for the app registrations (entra.microsoft.com). Never click "Upgrade to pay-as-you-go" on the personal free account.
+- Turn writes off in one step if ever needed: `az webapp config appsettings set -g rg-advisorflow -n app-advisorflow-api-ee1 --settings Features__AllowWrites=false`.
 
 ## Known gaps
 

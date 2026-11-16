@@ -51,12 +51,16 @@ auth: { tenantId: '<tenant id>', clientId: '<Web client id>', apiScope: 'api://<
 
 `AdvisorFlow_Changed_By__c` on Account, Contact and Opportunity, editable through `AdvisorFlow API Write`, readable through `AdvisorFlow API Read` (see the Salesforce runbook §12).
 
-## 6. Verification (to record)
+## 6. Verification (16 Nov 2026)
 
-| Check | Expected |
+| Check | Result |
 |---|---|
-| Anonymous `POST /api/households` | `401` |
-| Signed in, no Advisor role | `403` |
-| Advisor creates a household on the live site | `201`; Salesforce shows *Last changed by (AdvisorFlow)* = the advisor |
-| Advisor moves an opportunity to Qualification | Flow creates the follow-up; it appears on Activities and the Dashboard |
-| Reads without signing in | still work |
+| `dotnet test` (incl. 25 access tests: anonymous `401`, no role or scope `403`, reads public, advisor recorded) | 278/278 pass; CI #29 green incl. Salesforce validation, deployed |
+| Web tests | 37/37 pass; CI #12 green, deployed |
+| Local, real Entra token, mock data | Sign-in works; create household, create opportunity, move stage all accepted |
+| Live, before `AllowWrites`: anonymous `POST /api/households` | `401` (new code live) |
+| Live, `Features__AllowWrites=true`, signed in as the owner (Advisor) | Created **Patel Household** (High), added **Priya Patel** (became primary, BR-HH-003), created *Patel Household - Retirement Planning* ($5,000, Prospecting), moved it to **Qualification** |
+| Salesforce Flow (ADR-011) | Created *Qualification follow-up: Patel Household - Retirement Planning*, due 19 Nov 2026, shown at once on the household as **Auto** |
+| *Last changed by (AdvisorFlow)* (ADR-016), queried as the integration user | `elusiyan eluwole` on the Account, Contact and Opportunity |
+
+Note: Entra issues **v1** access tokens to this API (the registration's default), which carry `name` but not `preferred_username`, so the field holds the advisor's display name only. The code falls back accordingly; switching the API registration to v2 tokens (`requestedAccessTokenVersion: 2` in its manifest) would add the sign-in name.
