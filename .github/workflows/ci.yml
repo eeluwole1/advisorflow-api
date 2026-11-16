@@ -54,3 +54,37 @@ jobs:
           python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('manifest/baseline-package.xml')"
       # Org-connected validation (sf project deploy validate) is added in M2,
       # once a CI auth secret for the Developer Edition org exists.
+
+  deploy:
+    name: Deploy to Azure App Service
+    # Only pushes to main, and only after every check above has passed.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [dotnet, contract, salesforce]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://app-advisorflow-api-ee1.azurewebsites.net/health
+    # A newer push queues behind a running deploy instead of cancelling it half-way.
+    concurrency:
+      group: deploy-api
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet publish src/AdvisorFlow.Api --configuration Release --output publish
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: app-advisorflow-api-ee1
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: publish
+      - name: Smoke test
+        # The free tier starts the app on demand, so allow a few minutes.
+        run: |
+          for i in $(seq 1 18); do
+            if curl -fsS https://app-advisorflow-api-ee1.azurewebsites.net/health; then echo; exit 0; fi
+            sleep 10
+          done
+          echo "The API did not report Healthy after deploying." >&2
+          exit 1
