@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Service_Type__c</fullName>
+    <description>Type of advisory service (blueprint section 9).</description>
+    <label>Service Type</label>
+    <required>false</required>
+    <trackFeedHistory>false</trackFeedHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Retirement Planning</fullName>
+                <default>false</default>
+                <label>Retirement Planning</label>
+            </value>
+            <value>
+                <fullName>Investment Advisory</fullName>
+                <default>false</default>
+                <label>Investment Advisory</label>
+            </value>
+            <value>
+                <fullName>Financial Review</fullName>
+                <default>false</default>
+                <label>Financial Review</label>
+            </value>
+            <value>
+                <fullName>Other</fullName>
+                <default>false</default>
+                <label>Other</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

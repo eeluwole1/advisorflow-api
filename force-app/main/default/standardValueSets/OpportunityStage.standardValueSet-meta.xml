@@ -91,4 +91,24 @@
         <probability>0</probability>
         <won>false</won>
     </standardValue>
+    <standardValue>
+        <fullName>Needs Assessment</fullName>
+        <default>false</default>
+        <description>Advisor gathers the household&apos;s goals, circumstances and constraints to scope the advisory engagement.</description>
+        <label>Needs Assessment</label>
+        <closed>false</closed>
+        <forecastCategory>Pipeline</forecastCategory>
+        <probability>30</probability>
+        <won>false</won>
+    </standardValue>
+    <standardValue>
+        <fullName>Proposal Presented</fullName>
+        <default>false</default>
+        <description>Advisor has presented the recommended advisory service and fee proposal to the household.</description>
+        <label>Proposal Presented</label>
+        <closed>false</closed>
+        <forecastCategory>BestCase</forecastCategory>
+        <probability>60</probability>
+        <won>false</won>
+    </standardValue>
 </StandardValueSet>
