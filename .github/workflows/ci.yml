@@ -52,6 +52,7 @@ jobs:
         run: |
           python3 -m json.tool sfdx-project.json > /dev/null
           python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('manifest/baseline-package.xml')"
+          python3 -c "import xml.dom.minidom; xml.dom.minidom.parse('manifest/ci-validate-package.xml')"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -59,14 +60,55 @@ jobs:
       - run: npm ci
       - name: Lightning Web Component tests (Jest)
         run: npm run test:lwc
-      # Apex tests run in the org (sf apex run test, runbook §10f). Org-connected
-      # validation in CI needs its own least-privilege CI user and secret (project-status.md).
+
+  salesforce-validate:
+    name: Salesforce validate (deploy dry-run + Apex tests)
+    # A full deploy of the project's Salesforce source plus every local Apex test, then a
+    # rollback (ADR-014). Signs in as the API-only CI user; nothing is saved to the org.
+    needs: salesforce
+    # Pull requests from forks get no secrets: skip there instead of failing.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      SF_CI_CLIENT_ID: ${{ secrets.SF_CI_CLIENT_ID }}
+      SF_CI_JWT_KEY: ${{ secrets.SF_CI_JWT_KEY }}
+      SF_CI_USERNAME: ${{ secrets.SF_CI_USERNAME }}
+      SF_INSTANCE_URL: https://orgfarm-c274b45e01-dev-ed.develop.my.salesforce.com
+      SF_DISABLE_TELEMETRY: "true"
+      SF_AUTOUPDATE_DISABLE: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Salesforce CLI
+        run: npm install --global @salesforce/cli@2
+      - name: Sign in as the CI user (JWT bearer flow)
+        run: |
+          umask 077
+          printf '%s\n' "$SF_CI_JWT_KEY" > "$RUNNER_TEMP/ci.key"
+          sf org login jwt --client-id "$SF_CI_CLIENT_ID" --jwt-key-file "$RUNNER_TEMP/ci.key" \
+            --username "$SF_CI_USERNAME" --instance-url "$SF_INSTANCE_URL" --alias ci
+          rm -f "$RUNNER_TEMP/ci.key"
+      - name: Validate deploy and run all local Apex tests (nothing is saved)
+        run: |
+          sf project deploy validate --target-org ci --manifest manifest/ci-validate-package.xml \
+            --test-level RunLocalTests --wait 30 \
+            --junit --coverage-formatters json-summary --results-dir sf-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: salesforce-validate-results
+          path: sf-results
+      - name: Sign out
+        if: always()
+        run: sf org logout --target-org ci --no-prompt || true
 
   deploy:
     name: Deploy to Azure App Service
     # Only pushes to main, and only after every check above has passed.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [dotnet, contract, salesforce]
+    needs: [dotnet, contract, salesforce, salesforce-validate]
     runs-on: ubuntu-latest
     environment:
       name: production

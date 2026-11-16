@@ -352,3 +352,78 @@ sf project deploy start --target-org advisorflow-dev --dry-run `
 ```
 
 Place it on the page: open an opportunity → gear → **Edit Page** → drag **AdvisorFlow Follow-ups** (Custom) into the right column → **Save** → **Activate** → **Assign as Org Default** → Save. Placing it is a page-layout change made in Setup; retrieving the FlexiPage into the repo is optional.
+
+## 11. Salesforce validation in CI (ADR-014)
+
+Every push runs a validation-only deploy plus all local Apex tests against the org, signed in as a dedicated, API-only CI user. Nothing is saved.
+
+### 11a. Deploy the CI permission set and the updated test class (as admin)
+
+```powershell
+sf project deploy start --target-org advisorflow-dev --dry-run `
+  --source-dir force-app/main/default/permissionsets/AdvisorFlow_CI_Deploy.permissionset-meta.xml `
+  --source-dir force-app/main/default/classes `
+  --test-level RunSpecifiedTests --tests OpportunityFollowUpsControllerTest --tests OpportunityFollowUpFlowTest
+# same command without --dry-run
+```
+
+### 11b. Key pair for CI (outside the repo)
+
+```powershell
+cd "$env:USERPROFILE\.advisorflow"
+Set-Alias openssl "C:\Program Files\Git\usr\bin\openssl.exe"
+openssl genrsa -out ci.key 2048
+openssl req -new -x509 -key ci.key -out ci.crt -days 365 -subj "/CN=AdvisorFlow CI"
+```
+
+`ci.key` is a credential: it goes only into the GitHub secret. `ci.crt` is uploaded to Salesforce (renew before it expires).
+
+### 11c. CI user
+
+Setup → Users → **New User**:
+
+| Setting | Value |
+|---|---|
+| Name | AdvisorFlow CI |
+| Username | `advisorflow.ci@eeluwole.dev` |
+| Email | the owner's own address (not recorded here) |
+| User license | Salesforce |
+| Profile | Minimum Access - Salesforce |
+| Role | None |
+| Generate new password and notify user | **Unticked** (the user never logs in with a password) |
+
+Then on the user: Permission Set Assignments → **AdvisorFlow CI Deploy**.
+
+### 11d. External Client App `AdvisorFlow CI` (`AdvisorFlow_CI`)
+
+Same shape as §7d: Local, callback `http://localhost:1717/OauthRedirect`, scopes `api` and `refresh_token, offline_access`, JWT bearer flow only with **`ci.crt`** uploaded; Policies → Admin approved users are pre-authorized → permission set **AdvisorFlow CI Deploy**. The Consumer Secret is not used.
+
+### 11e. Verify locally
+
+```powershell
+$clientId = Read-Host "CI Consumer Key"
+sf org login jwt --client-id $clientId --jwt-key-file "$env:USERPROFILE\.advisorflow\ci.key" `
+  --username advisorflow.ci@eeluwole.dev `
+  --instance-url https://orgfarm-c274b45e01-dev-ed.develop.my.salesforce.com --alias advisorflow-ci
+sf project deploy validate --target-org advisorflow-ci --manifest manifest/ci-validate-package.xml --test-level RunLocalTests --wait 30
+```
+
+If the login answers `invalid client credentials`, the Consumer Key and the uploaded certificate don't belong together: usually the key was copied from the other app (`AdvisorFlow API`). Copy it again from **AdvisorFlow CI** → Settings → OAuth Settings.
+
+Results on 16 Nov 2026:
+
+| Check | Result |
+|---|---|
+| JWT login as the CI user | Authorized |
+| First validate | Deploy 6/6 components; 10 of 14 tests failed with *Access to entity 'Account' denied*: the Flow tests ran as the CI user, who has no record access |
+| After the tests run as an advisor (`System.runAs`, ADR-014) | Deploy 6/6, **14/14 tests pass**, *Successfully validated the deployment*; nothing saved |
+
+### 11f. GitHub settings (repo → Settings → Secrets and variables → Actions)
+
+| Kind | Name | Value |
+|---|---|---|
+| Secret | `SF_CI_CLIENT_ID` | the CI app's Consumer Key |
+| Secret | `SF_CI_JWT_KEY` | contents of `ci.key` (`Get-Content -Raw "$env:USERPROFILE\.advisorflow\ci.key" \| Set-Clipboard`, paste, then `Set-Clipboard -Value " "`) |
+| Secret | `SF_CI_USERNAME` | `advisorflow.ci@eeluwole.dev` (a secret, so it is masked in logs) |
+
+The job is **Salesforce validate (deploy dry-run + Apex tests)** in `.github/workflows/ci.yml`; its JUnit and coverage results are uploaded as the `salesforce-validate-results` artifact.

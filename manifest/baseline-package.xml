@@ -5,7 +5,8 @@
   profile, layout and Salesforce-internal permission set in the org.
   Profiles are retrieved together with the objects so they carry field-level
   security for Account, Contact and Opportunity fields only.
-  The AdvisorFlow API permission sets define the integration user's access (ADR-007, ADR-008).
+  The AdvisorFlow API permission sets define the integration user's access (ADR-007, ADR-008);
+  AdvisorFlow_CI_Deploy defines the CI validation user's (ADR-014).
   Run scripts/retrieve-baseline.sh (or .ps1). See docs/deployment/salesforce-baseline-runbook.md.
 -->
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
@@ -51,6 +52,7 @@
     </types>
     <types>
         <members>AdvisorFlow_API_Read</members>
+        <members>AdvisorFlow_CI_Deploy</members>
         <members>AdvisorFlow_API_Write</members>
         <name>PermissionSet</name>
     </types>

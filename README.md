@@ -74,7 +74,7 @@ The `salesforce` profile only sets `Crm__Provider=Salesforce`; the connection se
 | `ArchitectureTests` | Layer rules: Domain ← Application ← Infrastructure ← Api |
 | `ApiDocsTests` | Swagger UI and contract served in Development, 404 in Production |
 
-CI (`.github/workflows/ci.yml`) runs the tests, a vulnerable-package check, an OpenAPI lint and a Salesforce project file check.
+CI (`.github/workflows/ci.yml`) runs the tests, a vulnerable-package check, an OpenAPI lint, the LWC Jest tests and a Salesforce validation (deploy dry-run plus every Apex test against the org, as an API-only CI user; ADR-014).
 
 ## API contract and versioning
 

@@ -10,7 +10,7 @@ A financial advisory CRM prototype: advisors see **households**, their **members
 |---|---|---|
 | Web (Angular 22, Tailwind 4, Vitest) | `eeluwole1/advisorflow-web` (`C:\advisorflow-web`) | https://zealous-pebble-02abce610.4.azurestaticapps.net |
 | API (.NET 10, layered) + Salesforce DX metadata + all docs | `eeluwole1/advisorflow-api` (`C:\advisorflow-api`) | https://app-advisorflow-api-ee1.azurewebsites.net (`/health`) |
-| Salesforce Developer Edition | alias `advisorflow-dev` (admin), `advisorflow-integration` (API user) | orgfarm-c274b45e01-dev-ed.develop.my.salesforce.com |
+| Salesforce Developer Edition | alias `advisorflow-dev` (admin), `advisorflow-integration` (API user), `advisorflow-ci` (CI validation user) | orgfarm-c274b45e01-dev-ed.develop.my.salesforce.com |
 
 ## Milestones
 
@@ -31,7 +31,7 @@ AdvisorFlow is the portfolio piece for **IG Wealth Management, Senior Salesforce
 ## Priorities until 23 Nov 2026 (decided 16 Nov)
 
 1. **Activities API: done 16 Nov** (contract 1.4.0, ADR-012, BR-ACT-003). Read-only task endpoints; overdue in America/Winnipeg time. Verify the SOQL against the real org once (runbook §10e query plus `Account.RecordType.DeveloperName = 'Household'`).
-2. **Apex test class: done 16 Nov.** `OpportunityFollowUpFlowTest`, 10/10 passing including a 200-record bulk test (runbook §10f). Still open: a Salesforce validation step in CI (dry-run deploy + tests via a JWT CI user with deploy rights; needs its own least-privilege user and secret).
+2. **Apex test class: done 16 Nov.** `OpportunityFollowUpFlowTest`, 10/10 passing including a 200-record bulk test (runbook §10f). Salesforce validation in CI (dry-run deploy + all Apex tests on every push, as an API-only least-privilege CI user): ADR-014, runbook §11.
 3. **Lightning Web Component: done 16 Nov.** `opportunityFollowUps` on the Opportunity record page (org default "Opportunity Record Page", desktop and phone), `OpportunityFollowUpsController` (`with sharing`, `WITH USER_MODE`); 14 Apex tests pass in the org, 5 Jest tests run in CI (runbook §10g).
 4. **Web Activities page: done 16 Nov.** Open / overdue / completed / all views with search and paging; Follow-ups section on each household; Flow-created tasks tagged "Auto".
 5. Trailhead: Flow, Apex and LWC badges as verifiable recent learning.
